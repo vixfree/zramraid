@@ -1,5 +1,5 @@
-# zraid
-PROJECT ZRAID
+# zram-raid
+PROJECT ZRAM-RAID
 
 Description<br>
 This project is a derivative of all the experiments using virtualization XEN \ KVM, which we started in 2012. Then we did not like the speed of the disk subsystem in HVM mode for WINDOWS 2003 servers.<br>
