@@ -1,0 +1,892 @@
+#!/bin/bash
+## zraid-maker
+## (c) author's idea and realization: Kleemov A. & Koshuba V.
+## script author: Koshuba V - stvixfree@gmail.com
+## all parameters
+option=$1;
+params=$2;
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+version="01.27";
+
+## msg [53]
+set_msg=( '"0" "1"' '"1" "1"' '"2" "1"' '"3" "1"' '"4" "1"' '"5" "1"' '"6" "1"' '"7" "1"' '"8" "1"' 
+        '"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "1"' 
+        '"17" "1"' '"18" "1"' '"19" "1"' '"20" "1"' '"21" "1"' '"22" "1"' '"23" "1"' '"24" "1"'
+        '"25" "1"' '"26" "1"' '"27" "1"' '"28" "1"' '"29" "1"' '"30" "1"' '"31" "1"' '"32" "1"'
+        '"33" "1"' '"34" "0"' '"35" "0"' '"36" "0"' '"37" "0"' '"38" "0"' '"39" "0"' '"40" "0"'
+        '"41" "0"' '"42" "1"' '"43" "1"' '"44" "1"' '"45" "0"' '"46" "1"' '"47" "1"' '"48" "1"'
+        '"49" "1"' '"50" "1"' '"51" "1"' '"52" "1"' '"53" "1"' );
+msg=();
+
+##
+lang=$(locale|grep LANG=|sed 's/\LANG=//g');
+rdate=$(date +%c);
+eval kernel_version="(" $(uname -r|sed 's/\./ /g'|awk '{print$1" "$2}') ")";
+test_module=$(find /lib/modules/$(uname -r) -name '*.ko'|grep zram|wc -m);
+test_jq=$(apt-cache policy jq | grep status);
+test_mdadm=$(apt-cache policy mdadm | grep status);
+##
+total_mem=$(cat /proc/meminfo |awk '/^MemTotal:/{print $2}');
+free_mem=$(cat /proc/meminfo |awk '/^MemAvailable:/{print $2}');
+limit_mem=0;
+info_limit_mem=0;
+zpath="/etc/zraid";
+zconfig="zraid.conf";
+zmsg="messages.dat";
+log="/var/log/zraid.log";
+reports=();
+id_zmd=();
+image_zmd=();
+size_zmd=();
+json_key=( "id" "image" );
+zdm_vars=( "id_zmd" "image_zmd" );
+input_unit=();
+math_unit=0;
+total_size_images=0;
+test_status=0;
+kernel_status=();									# [0]-kernel3x,[1]-kernel4x
+##
+set_md_id="";
+set_zram_id="";
+set_md_status=();									# [0]-on\off,[1]-load zram,[2]-in config
+##
+_blkid=$(whereis -b blkid|awk '/^blkid:/{print $2}');
+
+## functions & operations
+operation_test=( "clear" "checkDep" "loadMsg" "testId" "checkModule" "confRead" "testMd" "testImage" "reportConf" "printInfo" );
+operation_on=( "checkDep" "loadMsg" "testId" "confRead" "checkModule" "testMd" "testImage" "statusZraid" "createZraid" );
+operation_sign_on=(  "checkDep" "loadMsg" "testId" "confRead" "checkModule" "testImage" "inParams" "singleTestMd" "singleStart" );
+operation_sign_off=(  "checkDep" "loadMsg" "testId" "confRead" "checkModule" "testImage" "inParams" "singleTestMd" "singleStop" );
+operation_off=( "checkDep" "loadMsg" "testId" "confRead" "checkModule" "offZraid" );
+operation_status=( "checkDep" "loadMsg" "testId" "confRead"  "statusZraid" );
+operation_help=( "clear" "checkDep" "loadMsg" "printInfo" );
+execute_func=();
+
+## logic executor values
+iFs=();
+logic=();
+value_in="";
+lEnd=1;
+
+##--@F math functions
+## Byte <> Kb
+function Byte(){ if [ ! ${input_unit[2]} ]
+		then eval ${input_unit[1]}=$(echo "scale=0; ${input_unit[0]}/1024"|bc -lq);
+		else eval ${input_unit[1]}=$(echo ${input_unit[0]}*1024|bc -lq); 
+		fi }
+## Kb <> Byte
+function Kb() { if [ ! ${input_unit[2]} ] 
+		then eval ${input_unit[1]}=$(echo ${input_unit[0]}*1024|bc -lq);
+		else eval ${input_unit[1]}=$(echo "scale=0; ${input_unit[0]}/1024"|bc -lq);
+		fi }
+## Mb <> Byte
+function Mb() { if [ ! ${input_unit[2]} ]
+		then eval ${input_unit[1]}=$(echo ${input_unit[0]}*1024^2|bc -lq);
+		else eval ${input_unit[1]}=$(echo "scale=0; ${input_unit[0]}/1024^2"|bc -lq);
+		fi }
+## Gb <> Byte
+function Gb() { if [ ! ${input_unit[2]} ] 
+		then eval ${input_unit[1]}=$(echo ${input_unit[0]}*1024^3|bc -lq);
+		else eval ${input_unit[1]}=$(echo "scale=0; ${input_unit[0]}/1024^3"|bc -lq);
+		fi }
+## Tb <> Byte
+function Tb() { if [ ! ${input_unit[2]} ] 
+		then eval ${input_unit[1]}=$(echo ${input_unit[0]}*1024^4|bc -lq);
+		else eval ${input_unit[1]}=$(echo "scale=0; ${input_unit[0]}/1024^4"|bc -lq);
+		fi }
+
+## -@F logic executor
+function eXlogic() {
+lEnd=1;
+if [[ ${#iFs[@]} -eq 0 ]]||[[ ${#iFs[@]} != ${#logic[@]} ]]
+    then echo "exit";
+         exit 0;
+fi
+
+local exfunc=();
+for ((lg_index=0; lg_index != ${#iFs[@]}; lg_index++))
+ do
+    ## !! debug operation...
+    #echo "eXlogic = execution: function ${iFs[$lg_index]} : index=$lg_index";
+    local lg=$(echo $((${iFs[$lg_index]})) );
+    local exfunc=( ${logic[$lg_index]} );
+    local runfunc=$(echo ${exfunc[$lg]}| sed 's/\"//g');
+    $runfunc;
+    if [[ $lEnd == 0 ]] 
+        then lg_index=$((${#iFs[@]}-1)); 
+    fi
+done
+iFs=();
+logic=();
+value_in="";
+}
+
+##--@F write log events
+function writeToLog() {
+for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
+do
+    echo  "$rdate zraid message: ${reports[$rpt_index]}">>$log;
+done
+}
+
+##--@F make all errors
+function makeErr() {
+if [[ "$option" == "--on" ]]
+    then
+	if [ ! "$params" ]
+	    then
+	    reports[${#reports[@]}]="${msg[0]}";
+	    else
+	    reports[${#reports[@]}]=${msg[42]};
+	fi
+    else
+	reports[${#reports[@]}]=${msg[42]};
+fi
+
+ printInfo;
+ writeToLog;
+ exit 0;
+}
+
+function printInfo() {
+value_in="$option";
+iFs=(   "$(echo -n $value_in|wc -m) == 0"
+        "$(echo -n $value_in|sed 's/--help//g'|wc -m) == 0" 
+        "$(echo -n $value_in|sed 's/--test//g'|wc -m) == 0"
+        "$(echo -n ${#reports[@]}) == 0" );
+
+logic=( '"" "pInone"'
+        '"" "pIhelp"'
+        '"" "pItest"'
+        '"pIdf" "pInone"' );
+
+
+function pInone() {
+    lEnd=0;
+    clear
+    echo
+    echo -e ${msg[1]}"\n"${msg[2]}"\n"${msg[3]}"\n"${msg[4]}"\n"${msg[5]};
+    echo -e ${msg[52]}"\n"${msg[53]};
+    echo -e ${msg[31]}"\n"${msg[48]} $version;
+    exit 0;
+}
+
+function pIhelp() {
+    lEnd=0;
+    clear
+    echo
+    echo -e ${msg[2]}"\n"${msg[3]}"\n"${msg[4]}"\n"${msg[5]};
+    echo -e ${msg[51]}"\n"${msg[52]}
+    echo -e ${msg[31]}"\n"${msg[48]}  $version;
+    exit 0;
+}
+
+function pItest() {
+    lEnd=0;
+    info_free_mem=0;
+    info_total_mem=0;
+    input_unit=( "$free_mem" "info_free_mem" "1" );
+    Kb;
+    input_unit=( "$total_mem" "info_total_mem" "1" );
+    Kb;
+    echo "==============================================================...";
+    echo "${msg[32]} $info_total_mem""Mb ${msg[33]} $info_free_mem""Mb";
+    echo "==============================================================...";
+    for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
+        do
+        echo  "${reports[$rpt_index]}";
+    done
+    echo "--------------------------------------------------------------...";
+    exit 0;
+}
+
+## default function last eXlogic..
+function pIdf() {
+    for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
+        do
+    echo   "${reports[$rpt_index]}";
+    done
+    }
+eXlogic;
+}
+
+##--@F Check the program dependency
+function checkDep() {
+# This installation check jq
+if [ ! "$test_jq" ]
+    then
+    ## lang messages if yes then lang else us...
+    reports[${#reports[@]}]=${msg[6]};
+    makeErr
+fi
+# This installation check mdadm
+if [ ! "$test_mdadm" ]
+    then
+    reports[${#reports[@]}]=${msg[8]};
+    makeErr
+fi
+}
+
+##--@F read locale messages
+function loadMsg() {
+ # test enable file messages
+if [ ! -f $zpath/$zmsg ]
+    then
+    reports=();
+    reports[${#reports[@]}]="$zpath/$zmsg - file not found!";
+    makeErr;
+fi
+
+# read msg
+if [[ ! $(cat $zpath/$zmsg|grep "$lang"|wc -m) == 0 ]]
+    then
+        index_msg="$(cat $zpath/$zmsg | jq '."'$lang'".msg[]'|wc -l)";
+        if [[ ! "$index_msg" == "0" ]]||[[ "$index_msg" == "${#set_msg[@]}" ]]
+            then
+                for (( m_index=0; m_index != $index_msg; m_index++)) 
+                do
+                eval st_in_msg="(" ${set_msg[$m_index]} ")";
+                if [ "${st_in_msg[1]}" != "0" ]
+                    then
+                    read_msg=$(cat $zpath/$zmsg | jq '."'$lang'".msg['$m_index']'| sed 's/\"//g');
+                    msg[$m_index]="$read_msg";
+                    else
+                    msg[$m_index]="";
+                fi
+                done
+            else
+                reports=();
+                reports[${#reports[@]}]="$zpath/$zmsg - Incorrect file format or empty!";
+                makeErr;
+        fi
+    fi
+}
+
+##--@F check module zram & kernel version
+function checkModule() {
+# test kernel version
+iFs=(   "${kernel_version[0]} < 3"
+        "${kernel_version[0]} == 3" 
+	"${kernel_version[0]} == 4" 
+        "$test_module == 0" );
+logic=( '"" "notVersion"'
+        '"" "kernel3"'
+        '"" "kernel4"'
+	'"" "zramFalse"' );
+
+function notVersion() {
+	lEnd=0;
+        reports[${#reports[@]}]="${msg[28]}";
+	makeErr;
+}
+
+function kernel3() {
+kernel_status[${#kernel_status[@]}]="1";
+	    if (( "${kernel_version[1]}" < "14" ))
+		then
+		lEnd=0;
+		reports[${#reports[@]}]="${msg[28]}";
+		makeErr;
+	    fi
+}
+
+function kernel4() {
+kernel_status[${#kernel_status[@]}]="1";
+	    if (( "${kernel_version[1]}" > "2" ))
+		then
+		kernel_status[${#kernel_status[@]}]=1;
+	    fi
+}
+
+# test module zram
+function zramFalse() {
+    lEnd=0;
+    reports[${#reports[@]}]=${msg[27]};
+    makeErr;
+}
+
+eXlogic;
+}
+
+##--@F step operation
+function confRead() {
+# test enable file zraid.conf
+if [ ! -f $zpath/$zconfig ]
+    then
+    reports=();
+    reports[${#reports[@]}]=${msg[7]};
+    makeErr;
+fi
+# read config
+for (( rd_index=0; rd_index !=${#zdm_vars[@]}; rd_index++)) 
+ do
+    read_key=$(cat $zpath/$zconfig | jq '.md[].'${json_key[$rd_index]}| sed 's/\"//g');
+    eval ${zdm_vars[$rd_index]}="(" $read_key ")";
+done
+log=$(cat $zpath/$zconfig | jq '.log'| sed 's/\"//g');
+
+## test free memory
+value_mem=$(cat $zpath/$zconfig | jq '.limit_free_mem.value_size'| sed 's/\"//g');
+
+value_in="$value_mem";
+iFs=(   "$(echo -n $value_in|wc -m) == 0"
+        "$(echo -n $value_in|sed 's/%//g'|wc -m) == 0" 
+        "$(echo -n $value_in|sed 's/Kb//g'|wc -m) == 0" );
+logic=( '"" "lmem_Err"'
+        '"" "lmem_Per"'
+        '"lmem_Err" "lmem_Kb"' );
+
+lmem_Err() {
+reports=();
+reports[${#reports[@]}]="${msg[29]} $value_mem /or null - ${msg[10]}(${msg[30]}:Kb,%)";
+makeErr;
+    }
+
+lmem_Per() {
+lEnd=0;
+test_read_mem=0;
+input_unit=( "$free_mem" "test_read_mem" );
+Kb;
+math_unit=$(echo "scale=2; $(echo "scale=2; $test_read_mem/100"|bc -lq)*$(cat $zpath/$zconfig | jq '.limit_free_mem.size'| sed 's/\"//g')"|bc -lq|sed 's/\./ /g'|awk '{print$1}');
+## -"
+
+if (( "$math_unit" < 0 ))||[[ "$math_unit" == "" ]]||[[ ! "$math_unit" =~ ^([0-9]+)$ ]]
+        then
+        reports=();
+        reports[${#reports[@]}]="${msg[29]} $value_mem /or null - ${msg[10]}(${msg[30]}:Kb,%)";
+        makeErr;
+        else
+        limit_mem=$math_unit;
+        input_unit=( "$math_unit" "info_limit_mem" );
+        Byte;
+        math_unit=$info_limit_mem;
+        input_unit=( "$math_unit" "info_limit_mem" "1" );
+        Kb;
+fi
+    }
+
+lmem_Kb() {
+lEnd=0;
+input_unit=( "$(cat $zpath/$zconfig | jq '.limit_free_mem.size'| sed 's/\"//g')" "math_unit" );
+Kb;
+limit_mem=$math_unit;
+input_unit=( "$math_unit" "info_limit_mem");
+Mb;
+    }
+eXlogic;
+}
+
+##--@F step operation
+function testMd() {
+# test the md number parameters for errors and busy in system
+if [ ${#id_zmd[@]} -eq 0 ]
+    then reports[${#reports[@]}]="${msg[21]}${id_zmd[$md_index]} - ${msg[9]}";
+    makeErr;
+fi
+
+for (( md_index=0; md_index != ${#id_zmd[@]}; md_index++)) 
+ do
+    if (( "${id_zmd[$md_index]}" < 0 ))||[[ "${id_zmd[$md_index]}" == "" ]]||[[ ! "${id_zmd[$md_index]}" =~ ^([0-9]+)$ ]]
+	then reports[${#reports[@]}]="${msg[21]}${id_zmd[$md_index]} - ${msg[10]}";
+	makeErr;
+    fi
+###
+    if [ "$($_blkid /dev/md${id_zmd[$md_index]}|grep ${id_zmd[$md_index]})" ]
+	then reports[${#reports[@]}]="${msg[21]}${id_zmd[$md_index]} - ${msg[11]}";
+	makeErr;
+    fi
+done
+# test  the duble number md
+test_dub=( $(echo -e  ${id_zmd[@]}|tr " " "\n"|sort|tr "\n" " ") );
+for (( dub_index=0; dub_index != ${#id_zmd[@]}; dub_index++ )) 
+ do
+	dubtest_index=$(($dub_index+1));
+	if [[ ! $dubtest_index > $((${#id_zmd[@]}-1)) ]] 
+	    then 
+		if [[ $((${test_dub[dubtest_index]}-${test_dub[dub_index]})) == 0 ]];
+		 then reports[${#reports[@]}]="${msg[21]}${id_zmd[$dub_index]} - ${msg[12]}";
+		    makeErr;
+		fi
+	    fi
+done
+## ok test md*
+if [ "$option" == "--test" ]
+    then
+	reports[${#reports[@]}]=${msg[25]};
+fi
+}
+
+##--@F step operation
+function testImage() {
+
+function test_true() {
+if [ "$option" == "--test" ]
+    then
+	reports[${#reports[@]}]=${msg[26]};
+fi
+}
+
+function test_null() {
+if [ "$option" == "--test" ]
+    then
+reports[${#reports[@]}]=${msg[46]};
+fi
+}
+
+function sum_img() {
+## the sum size images 
+for (( image_index=0; image_index != ${#image_zmd[@]}; image_index++ )) 
+    do
+        if [ ! -f ${image_zmd[$image_index]} ]
+            then reports[${#reports[@]}]="${msg[22]}${image_zmd[$image_index]} - ${msg[13]}";
+        makeErr
+        fi
+    size_zmd[$image_index]=$(stat -c%s ${image_zmd[$image_index]});
+    done
+# test size image end size zram ...
+for (( im_index=0; im_index != ${#image_zmd[@]}; im_index++ )) 
+    do
+        total_size_images=$(($total_size_images+${size_zmd[$im_index]}));
+    done
+}
+
+function test_false() {
+    reports=(); 
+    reports[${#reports[@]}]="${msg[22]}$set_image - ${msg[14]}";
+    makeErr;
+}
+iFs=( "$(echo -n ${#image_zmd[@]}) > 0" );
+logic=( '"test_null" "sum_img"' );
+eXlogic;
+
+iFs=( "$(echo -n $total_size_images) <= $limit_mem" );
+logic=( '"test_false" "test_true"' );
+eXlogic;
+
+}
+
+##--@F step operation
+function reportConf() {
+    if (( $total_size_images > 1024 ))
+        then
+            input_unit=( "$total_size_images" "math_unit" "1" );
+            Kb;
+            rep_size="$math_unit""Kb";
+        else
+            rep_size="$total_size_images""b";
+        fi
+    reports[${#reports[@]}]="size images: $rep_size";
+    reports[${#reports[@]}]="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+    reports[${#reports[@]}]="${msg[20]} $info_limit_mem Mb";
+}
+
+##--@F step operation
+function createZraid(){
+local check_start="0"
+if [ "$(lsmod |grep zram|wc -m)" == 0 ]
+    then
+    modprobe zram num_devices=${#id_zmd[@]};
+    fi
+
+for ((crt_index=0; crt_index != ${#id_zmd[@]}; crt_index++))
+    do
+set_md_id=${id_zmd[$crt_index]};
+singleTestMd;
+local tstart_md=$(echo ${set_md_status[@]}|tr -d ' '|sed 's/\"//g');
+
+if [[ "$tstart_md" == "" ]] || [[ ! "$tstart_md" =~ ^([0-9]+)$ ]] || (( "$tstart_md" < "0" ))
+	then
+	    reports=();
+            reports[${#reports[@]}]=${msg[10]};
+            makeErr;
+fi
+if [[ "$tstart_md" == "001" ]]
+    then
+    check_start=$(echo $(($check_start+1)));
+    zblock_dev=$((${size_zmd[$crt_index]}));
+    echo $zblock_dev > /sys/block/zram$crt_index/disksize;
+    losetup -f "${image_zmd[$crt_index]}";
+    on_loop=$(losetup -a |grep "${image_zmd[$crt_index]}"|awk '{print$1}'|sed 's/\://g');
+    echo -e "y"|sudo mdadm --create /dev/md/${id_zmd[$crt_index]} --auto=yes --level=1 --raid-devices=2 missing $on_loop;
+    mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
+fi
+done
+if (( "$check_start" >"0" ))
+    then
+    reports[${#reports[@]}]=${msg[16]};
+    writeToLog;
+    printInfo;
+    else
+    reports[${#reports[@]}]=${msg[50]};
+    writeToLog;
+    printInfo;
+fi
+}
+
+##--@F step operation --------
+function offZraid(){
+local check_stop="0";
+for ((off_index=0; off_index != ${#id_zmd[@]}; off_index++))
+    do
+set_md_id=${id_zmd[$off_index]};
+singleTestMd;
+local tstop_md=$(echo ${set_md_status[@]}|tr -d ' '|sed 's/\"//g');
+
+if [[ "$tstop_md" == "" ]] || [[ ! "$tstop_md" =~ ^([0-9]+)$ ]] || (( "$tstop_md" < "0" ))
+	then
+	    reports=();
+            reports[${#reports[@]}]=${msg[10]};
+            makeErr;
+fi
+
+if [[ "$tstop_md" == "111" ]]||[[ "$tstop_md" == "101" ]]
+    then
+check_stop=$(echo $(($check_stop+1)));
+local off_set_loop=$(losetup -a |grep "${image_zmd[$off_index]}"|awk '{print$1}'|sed 's/\://g');
+local off_set_zraid=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n1|awk '{print$5}'|sed 's/\[2]//g');
+mdadm -S /dev/md/$set_md_id;
+    if [[ "$off_set_loop" ]]
+	then
+	losetup -d $off_set_loop;
+    fi
+
+local kernel_type=$(echo ${kernel_status[@]}|tr -d ' '|sed 's/\:\"//g');
+    if [ "$kernel_type" == "11" ]
+	then
+	    if [ "$(lsmod|grep zram|wc -m)" != "0" ]
+		then
+		echo $(echo $off_set_zraid|sed 's/\dev//g'|sed 's/\zram//g'|sed 's/\///g') > /sys/class/zram-control/hot_remove ;
+	    fi
+    fi
+fi
+done
+
+if [ $(lsmod|grep zram|wc -m) ] 
+    then  modprobe -r zram; 
+fi
+if (( "$check_stop" >"0" ))
+    then
+    reports[${#reports[@]}]=${msg[17]};
+    writeToLog;
+    printInfo;
+    else
+    reports[${#reports[@]}]=${msg[19]};
+    writeToLog;
+    printInfo;
+fi
+}
+
+##--@F step operation
+function statusZraid(){
+status=();
+for ((st_index=0; st_index != ${#id_zmd[@]}; st_index++))
+	do
+	test_loop="$(cat /proc/mdstat |grep md${id_zmd[$st_index]}|awk '{print$6}'|cut -d'[' -f1)";
+	if [ "$test_loop" ]
+	    then
+	    test_zmd="$(sudo losetup -a |grep $test_loop|awk '{print$3}'|grep ${image_zmd[$st_index]}|wc -m)";
+	    if [ "$test_zmd" ]
+		then status[${#status[@]}]="md${id_zmd[$st_index]}";
+	    fi
+	fi
+done
+if [ $test_status != 0 ] 
+    then
+	test_status=0;
+	if [ ! ${#status[@]} == 0 ]
+	    then 
+		reports[${#reports[@]}]="${msg[18]} ${status[@]}";
+		writeToLog;
+		printInfo;
+		exit 0;
+	else
+		reports[${#reports[@]}]=${msg[19]};
+		writeToLog;
+		printInfo;
+		exit 0;
+	fi
+fi
+}
+
+##--@F step operation
+function testId() {
+if (( ! $(id|grep "root"|wc -m) ))
+	then
+	reports=(); 
+	reports[${#reports[@]}]="${msg[47]}";
+	makeErr;
+fi
+}
+
+##............................................................................................
+function singleStart() {
+
+local tset_md=$(echo ${set_md_status[@]}|tr -d ' '|sed 's/\"//g');
+if [[ "$tset_md" == "" ]] || [[ ! "$tset_md" =~ ^([0-9]+)$ ]] || (( "$tset_md" < "0" ))
+	then
+	    reports=();
+            reports[${#reports[@]}]=${msg[10]};
+            makeErr;
+fi
+iFs=( 	"$tset_md == 001"
+	"$tset_md == 111"
+	"$tset_md == 100"
+	"$tset_md == 000" );
+logic=( '"" "startSmd"' 
+	'"" "noStartSmd"' 
+	'"" "busSmd"' 
+	'"" "noConfSmd"' );
+
+function noStartSmd() {
+	lEnd=0;
+	reports=();
+        reports[${#reports[@]}]="md$set_md_id${msg[50]}";
+        printInfo;
+	exit 0;
+}
+
+function busSmd() {
+	lEnd=0;
+	reports=();
+        reports[${#reports[@]}]="md$set_md_id${msg[15]}";
+        printInfo;
+	exit 0;
+}
+
+function noConfSmd() {
+	lEnd=0;
+	reports=();
+        reports[${#reports[@]}]="md$set_md_id : ${msg[9]}";
+        printInfo;
+	exit 0;
+}
+
+function startSmd () {
+lEnd=0;
+local on_set_image="$(cat $zpath/$zconfig|jq -c '.md[]|select(.id == "'$set_md_id'")|.image'|sed 's/\"//g' )";
+local on_set_loop="$(losetup -f)";
+losetup "$on_set_loop" "$on_set_image";
+if (( $(lsmod|grep zram|wc -m) != 0 ))
+    then
+    cat /sys/class/zram-control/hot_add >/dev/nill ;  ## add zram dev!
+    else
+    modprobe zram num_devices=1;
+fi
+local set_zram_id="$(echo $(($(ls /dev/zram*|sed 's/\dev//g'|sed 's/\zram//g'|sed 's/\///g'|tr -d '\r\n'|wc -c)-1)))";
+local zset_block_dev=$(stat -c%s "$on_set_image");
+echo $zset_block_dev > /sys/block/zram$set_zram_id/disksize;
+echo -e "y"|sudo mdadm --create /dev/md/$set_md_id --auto=yes --level=1 --raid-devices=2 missing $on_set_loop;
+mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
+}
+eXlogic;
+reports[${#reports[@]}]="${msg[43]} : start - /dev/md$set_md_id";
+writeToLog;
+echo -e  "${reports[@]}";
+}
+
+##............................................................................................
+function singleStop() {
+local tset_md=$(echo ${set_md_status[@]}|tr -d ' '|sed 's/\"//g');
+if [[ "$tset_md" == "" ]] || [[ ! "$tset_md" =~ ^([0-9]+)$ ]] || (( "$tset_md" < "0" ))
+	then
+	    reports=();
+            reports[${#reports[@]}]=${msg[10]};
+            makeErr;
+fi
+iFs=( 	"$tset_md == 001"
+	"$tset_md == 111"
+	"$tset_md == 101"
+	"$tset_md == 100"
+	"$tset_md == 000" );
+logic=( '"" "noStopSmd"' 
+	'"" "stopSmd"' 
+	'"" "stopSmd"' 
+	'"" "sBusSmd"' 
+	'"" "noConfSmd"' );
+
+function noStopSmd() {
+	lEnd=0;
+	reports=();
+        reports[${#reports[@]}]="${msg[44]}md$set_md_id";
+	reports[${#reports[@]}]="${msg[42]}";
+        printInfo;
+	exit 0;
+}
+
+function sBusSmd() {
+	lEnd=0;
+	reports=();
+        reports[${#reports[@]}]="md$set_md_id${msg[15]}";
+        printInfo;
+	exit 0;
+}
+
+function noConfSmd() {
+	lEnd=0;
+	reports=();
+        reports[${#reports[@]}]="md$set_md_id : ${msg[9]}";
+        printInfo;
+	exit 0;
+}
+
+function stopSmd () {
+lEnd=0;
+local off_set_loop="/dev/$(ls /sys/block/"md$set_md_id"/md/|grep loop|sed 's/dev-//g')";
+local off_set_zraid=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n1|awk '{print$5}'|sed 's/\[2]//g');
+mdadm -S /dev/md/$set_md_id;
+
+echo $(echo $off_set_zraid|sed 's/\dev//g'|sed 's/\zram//g'|sed 's/\///g') > /sys/class/zram-control/hot_remove;
+if [[ $off_set_loop ]]
+    then
+    losetup -d $off_set_loop;
+fi
+}
+eXlogic;
+reports[${#reports[@]}]="${msg[43]} : stop - /dev/md$set_md_id";
+writeToLog;
+echo  -e "${reports[@]}";
+}
+
+##...........................................................................................
+function singleTestMd() {
+local check_md=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n 1|awk '{print$1}'|wc -m);
+local check_zram=$(cat /proc/mdstat |grep "md$set_md_id"|grep zram|wc -m);
+local check_conf=$(cat $zpath/$zconfig|jq -c '.md[]."id"."'$set_md_id'"'|cat -n|grep [0]|sed 's/\[0]//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
+
+iFs=(   "$check_md == 0"
+        "$check_conf == 0"
+        "$check_zram == 0" );
+
+logic=( '"statusOn" "statusOff"'                                                # test on MD
+	'"mDconfOn" "mDconfOff"'                                                # test MD in conf
+        '"mDzramOn" "mDzramOff"'                                                # test  zram in MD
+        );
+
+    function statusOn() {
+	set_md_status[0]="1";
+    }
+    
+    function statusOff() {
+	set_md_status[0]="0";
+    }
+
+    function mDzramOn() {
+	set_md_status[1]="1";
+    }
+
+    function mDzramOff() {
+	set_md_status[1]="0";
+    }
+    
+    function mDconfOn() {
+	set_md_status[2]="1";
+    }
+    
+    function mDconfOff() {
+	set_md_status[2]="0";
+    }
+eXlogic;
+}
+
+##...........................................................................................
+function inParams() {
+local kernel_type=$(echo ${kernel_status[@]}|tr -d ' ');
+if (( "$kernel_type" != "11" ))
+    then
+    reports=(); 
+	reports[${#reports[@]}]="${msg[49]}";
+	makeErr;
+fi
+eval set_params="(" $(echo -e $params|sed 's/\md//g') ")";
+if ((  "${#set_params[@]}" >= "1" ))
+    then
+    set_md_id="${set_params[0]}";
+        if [[ "$set_md_id" == "" ]]||[[ ! "$set_md_id" =~ ^([0-9]+)$ ]]||(( "$set_md_id" <= "0" ))
+            then
+                reports=();
+                reports[${#reports[@]}]="${msg[10]}";
+                makeErr;
+        fi
+    else
+        reports=();
+        reports[${#reports[@]}]="${msg[10]}";
+        makeErr;
+fi
+
+}
+
+
+##--@F executor
+function executor() {
+if [[ ${#execute_func[@]} -eq 0 ]] 
+    then echo "exit";
+	 exit 0; 
+fi
+for ((ex_index=0; ex_index != ${#execute_func[@]}; ex_index++))
+ do
+    ## !! debug operation...
+    #echo "execution: function ${execute_func[ex_index]}"
+ ${execute_func[ex_index]};
+done
+}
+
+
+##- Begin ZRAID
+case "$option" in
+
+## on zraid
+"--on" | "--on" )
+if [ ! "$params" ]
+    then
+    execute_func=( ${operation_on[@]} );
+    executor;
+    else
+    execute_func=( ${operation_sign_on[@]} );
+    executor;
+fi
+exit 0;
+;; 
+
+## off zraid
+"--off" | "--off" )
+if [ ! "$params" ]
+    then
+    execute_func=( ${operation_off[@]} );
+    executor;
+    else
+    execute_func=( ${operation_sign_off[@]} );
+    executor;
+fi
+exit 0;
+;;
+
+## status zraid
+"--status" | "--status" )
+test_status=1;
+execute_func=( ${operation_status[@]} );
+executor;
+exit 0;
+;;
+
+## test config
+"--test" | "--test" )
+execute_func=( ${operation_test[@]} );
+executor;
+exit 0;
+;;
+
+## help
+"--help" | "--help" )
+execute_func=( ${operation_help[@]} );
+executor;
+exit 0;
+;;
+
+* )
+# selecting defaults.
+execute_func=( ${operation_help[@]} );
+executor;
+exit 1;
+;;
+esac

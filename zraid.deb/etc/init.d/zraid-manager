@@ -1,0 +1,53 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          zraid
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start the zraid
+# Description:       starts zraid using start-stop-daemon
+### END INIT INFO
+## переменная управления
+parms=$1
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+path_run="/usr/local/bin";
+if [[ "$parms" = '' ]];
+ then 
+ exit 0
+fi
+
+### begin
+case "$parms" in
+# Обратите внимание: переменная взята в кавычки.
+"start" | "start" )
+$path_run/zraid-maker --on
+exit 0
+;;
+
+"stop" | "stop" )
+$path_run/zraid-maker --off
+exit 0
+;;
+
+"restart" | "restart" )
+$path_run/zraid-maker --off
+sleep 3
+$path_run/zraid-maker --on
+exit 0
+;;
+
+
+"status" | "status" )
+$path_run/zraid-maker --status
+exit 0
+;;
+
+
+* )
+# Выбор по-умолчанию.
+echo
+echo "no input parameters."
+exit 1
+;;
+esac

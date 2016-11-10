@@ -1,0 +1,247 @@
+#!/bin/bash
+## zraid-install (Default for Debian & Ubuntu)
+## (c) author's idea and realization: Kleemov A. & Koshuba V.
+## script author: Koshuba V - stvixfree@gmail.com
+## version = 12.08.16
+option=$1;
+rdate=$(date +%c);
+reports=();
+test_module=$(find /lib/modules/$kernel_version -name '*.ko'|grep zram|wc -m);
+test_jq=$(apt-cache policy jq | grep status);
+test_mdadm=$(apt-cache policy mdadm | grep status);
+log="/var/log/syslog";
+eval kernel_version="(" $(uname -r|sed 's/\./ /g') ")";
+
+## functions & operations
+operation_install=( "clear" "testId" "checkDep" "checkMod" "install" "printInfo" );
+operation_uninstall=( "clear" "testId" "checkDep" "checkMod" "uninstall" "printInfo" );
+operation_help=( "clear" "printInfo" );
+execute_func=();
+
+## -@F logic executor
+function eXlogic() {
+lEnd=1;
+if [[ ${#iFs[@]} -eq 0 ]]||[[ ${#iFs[@]} != ${#logic[@]} ]]
+    then echo "exit";
+         exit 0;
+fi
+
+local exfunc=();
+for ((lg_index=0; lg_index != ${#iFs[@]}; lg_index++))
+ do
+    ## !! debug operation...
+    #echo "eXlogic = execution: function ${iFs[$lg_index]} : index=$lg_index";
+    local lg=$(echo $((${iFs[$lg_index]})) );
+    local exfunc=( ${logic[$lg_index]} );
+    local runfunc=$(echo ${exfunc[$lg]}| sed 's/\"//g');
+    $runfunc;
+    if [[ $lEnd == 0 ]] 
+        then lg_index=$((${#iFs[@]}-1)); 
+    fi
+done
+iFs=();
+logic=();
+value_in="";
+}
+
+
+##--@F write log events
+function writeToLog() {
+for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
+do
+    echo  "$rdate zraid install  message: ${reports[$rpt_index]}">>$log;
+done
+}
+
+function printInfo() {
+value_in="$option";
+iFs=(   "$(echo -n $value_in|wc -m) == 0"
+        "$(echo -n $value_in|sed 's/--help//g'|wc -m) == 0" 
+        "$(echo -n ${#reports[@]}) == 0" );
+
+logic=( '"" "pIhelp"'
+        '"" "pIhelp"'
+        '"pIdf" "pIhelp"' );
+
+function pIhelp() {
+    lEnd=0;
+    clear
+    echo
+    echo -e "install: zraid-install --install";
+    echo -e "uninstall: zraid-install --uninstall";
+    echo -e "help: zraid-install --help";
+    exit 0;
+}
+
+## default function last eXlogic..
+function pIdf() {
+    for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
+        do
+    echo   "${reports[$rpt_index]}";
+    done
+    exit 0;
+    }
+eXlogic;
+}
+
+##--@F make all errors
+function makeErr() {
+ reports[${#reports[@]}]="Operation not succeded";
+ printInfo;
+ writeToLog;
+ exit 0;
+}
+
+
+##@F-tests
+function checkMod() {
+    if (( "${kernel_version[0]}" >= "3" ))
+	then
+	    if (( ! "${kernel_version[1]}" >= "14" ))
+		then 
+	    reports[${#reports[@]}]="Sorry Kernel version < 3.14.x";
+	    makeErr;
+		exit 0;
+	    fi
+	else
+	    reports[${#reports[@]}]="Sorry Kernel version < 3.x";
+	    makeErr;
+		exit 0;
+    fi
+# test module zram
+if [ $test_module == 0 ] 
+    then
+    reports[${#reports[@]}]="The current kernel does not find zram module";
+    makeErr;
+fi
+
+}
+
+##--@F Check the program dependency
+function checkDep() {
+# This installation check jq
+if [ ! "$test_jq" ]
+    then
+    ## lang messages if yes then lang else us...
+    reports[${#reports[@]}]="Do not set jq package";
+    makeErr;
+fi
+# This installation check mdadm
+if [ ! "$test_mdadm" ]
+    then
+    reports[${#reports[@]}]="Do not set mdadm package";
+    makeErr;
+fi
+
+## check Debian or Ubuntu...
+##
+}
+
+
+function install() {
+if [ ! -d "/etc/zraid" ]
+    then
+	mkdir -p /etc/zraid;
+fi
+cp -f $PWD/etc/zraid/messages.dat /etc/zraid/messages.dat;
+cp -f $PWD/etc/zraid/zraid-config /etc/zraid/zraid-config;
+cp -f $PWD/etc/zraid/zraid-maker /etc/zraid/zraid-maker;
+cp -f $PWD/etc/init.d/zraid-manager /etc/init.d/zraid-manager;
+cp -f $PWD/etc/default/zraid /etc/default/zraid;
+chmod 0755 $PWD/etc/init.d/zraid-manager /etc/init.d/zraid-manager;
+chown root:root $PWD/etc/init.d/zraid-manager /etc/init.d/zraid-manager;
+chmod 0755 $PWD/etc/zraid/messages.dat /etc/zraid/messages.dat;
+chown root:root $PWD/etc/zraid/messages.dat /etc/zraid/messages.dat;
+chmod 0755 $PWD/etc/zraid/zraid-config /etc/zraid/zraid-config;
+chown root:root $PWD/etc/zraid/zraid-config /etc/zraid/zraid-config;
+chmod 0755 $PWD/etc/zraid/zraid-maker /etc/zraid/zraid-maker;
+chown root:root $PWD/etc/zraid/zraid-maker /etc/zraid/zraid-maker;
+## update-rc.0 ..
+ln -s /etc/zraid/zraid-maker /usr/local/bin/zraid-maker;
+ln -s /etc/zraid/zraid-config /usr/local/bin/zraid-config;
+reports[${#reports[@]}]="zraid install susseful";
+writeToLog;
+printInfo;
+}
+
+function uninstall() {
+
+function zrDel() {
+	rm -f /usr/local/bin/zraid-maker;
+	rm -f /usr/local/bin/zraid-config;
+	rm -f /etc/zraid/messages.dat;
+	rm -f /etc/zraid/zraid-config;
+	rm -f /etc/zraid/zraid-maker;
+	rm -f /etc/init.d/zraid-manager;
+	rm -f /etc/default/zraid;
+    }
+
+if [ ! -f "/etc/zraid/zraid.conf" ]
+    then
+    zrDel;
+    rm -rd /etc/zraid;
+    else
+    zrDel;
+fi
+reports[${#reports[@]}]="zraid uninstall susseful";
+writeToLog;
+printInfo;
+
+}
+
+##--@F step operation
+function testId() {
+if (( ! $(id|grep "root"|wc -m) ))
+        then
+        reports=(); 
+        reports[${#reports[@]}]="It is only available with root privileges";
+        makeErr;
+fi
+}
+
+
+##--@F executor
+function executor() {
+if [[ ${#execute_func[@]} -eq 0 ]] 
+    then echo "exit";
+         exit 0; 
+fi
+for ((ex_index=0; ex_index != ${#execute_func[@]}; ex_index++))
+ do
+    ## !! debug operation...
+    ##echo "execution: function ${execute_func[ex_index]}"
+ ${execute_func[ex_index]};
+done
+}
+
+##- Begin ZRAID
+case "$option" in
+
+## install zraid
+"--install" | "--install" )
+execute_func=( ${operation_install[@]} );
+executor;
+exit 0
+;;
+
+## uninstall zraid
+"--uninstall" | "--uninstall" )
+execute_func=( ${operation_uninstall[@]} );
+executor;
+exit 0
+;;
+
+## help
+"--help" | "--help" )
+execute_func=( ${operation_help[@]} );
+executor;
+exit 0
+;;
+
+* )
+# selecting defaults.
+execute_func=( ${operation_help[@]} );
+executor;
+exit 1
+;;
+esac
