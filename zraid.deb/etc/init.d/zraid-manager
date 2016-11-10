@@ -8,7 +8,7 @@
 # Short-Description: start the zraid
 # Description:       starts zraid using start-stop-daemon
 ### END INIT INFO
-## переменная управления
+## control value
 parms=$1
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 path_run="/usr/local/bin";
@@ -19,7 +19,7 @@ fi
 
 ### begin
 case "$parms" in
-# Обратите внимание: переменная взята в кавычки.
+# 
 "start" | "start" )
 $path_run/zraid-maker --on
 exit 0
@@ -45,7 +45,7 @@ exit 0
 
 
 * )
-# Выбор по-умолчанию.
+# default
 echo
 echo "no input parameters."
 exit 1
