@@ -1,0 +1,14 @@
+[Unit]
+Description=Activation of zraid
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+Before=local-fs.target shutdown.target
+Wants=systemd-udev-settle.service
+
+[Service]
+ExecStart=/etc/init.d/zraid-manager boot
+ExecStop=/etc/init.d/zraid-manager stop
+Type=oneshot
+
+[Install]
+WantedBy=local-fs.target
