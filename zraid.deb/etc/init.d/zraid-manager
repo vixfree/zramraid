@@ -1,51 +1,67 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          zraid
-# Required-Start:    $local_fs $remote_fs
+# Provides:          zraid-manager
+# Required-Start:    udev $local_fs $remote_fs $time
 # Required-Stop:     $local_fs $remote_fs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: start the zraid
 # Description:       starts zraid using start-stop-daemon
 ### END INIT INFO
-## control value
+## version =05.08
+## переменная управления
 parms=$1
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-path_run="/usr/local/bin";
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+source "/etc/default/zraid";
+##
+zpath="/etc/zraid";
 if [[ "$parms" = '' ]];
- then 
+ then
+    echo "/etc/init.d/zraid-manager {start|stop|restart|status}"
  exit 0
 fi
 
+function zramBoot() {
+if [ $(echo $(($(echo $USER|wc -m)-1))) == 0 ]
+    then
+    if [ $(echo "$mode"|grep "auto"|wc -m) == 0 ]
+	then
+	    exit 0;
+	else
+	$zpath/zraid-maker --on
+    fi
+    exit 0;
+fi
+$zpath/zraid-maker --on
+}
+
 ### begin
 case "$parms" in
-# 
+# Обратите внимание: переменная взята в кавычки.
 "start" | "start" )
-$path_run/zraid-maker --on
+zramBoot;
 exit 0
 ;;
 
 "stop" | "stop" )
-$path_run/zraid-maker --off
+$zpath/zraid-maker --off
 exit 0
 ;;
 
 "restart" | "restart" )
-$path_run/zraid-maker --off
+$zpath/zraid-maker --off
 sleep 3
-$path_run/zraid-maker --on
+zramBoot;
 exit 0
 ;;
-
 
 "status" | "status" )
-$path_run/zraid-maker --status
+$zpath/zraid-maker --status
 exit 0
 ;;
 
-
 * )
-# default
+# Выбор по-умолчанию.
 echo
 echo "no input parameters."
 exit 1
