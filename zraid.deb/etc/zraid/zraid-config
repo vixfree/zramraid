@@ -6,9 +6,8 @@
 ##settime=$(date +%s%3N);
 option=$1;
 params=$2;
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-version="01.16"
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zraid";
+version="05.08";
 ## msg [53]
 set_msg=( '"0" "0"' '"1" "0"' '"2" "0"' '"3" "0"' '"4" "0"' '"5" "0"' '"6" "1"' '"7" "1"' '"8" "1"' 
 	'"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "0"' 
@@ -30,8 +29,8 @@ info_limit_mem=0;
 total_size_images=0;
 zpath="/etc/zraid";
 zconfig="zraid.conf";
-zmsg="messages.dat";
-log="report.log";
+zmsg="/etc/zraid/messages.dat";
+log="/var/log/zraid.log";
 reports=();
 id_zmd=();
 image_zmd=();
@@ -210,17 +209,17 @@ fi
 ##--@F read locale messages
 function loadMsg() {
  # test enable file messages
-if [ ! -f $zpath/$zmsg ]
+if [ ! -f $zmsg ]
     then
     reports=();
-    reports[${#reports[@]}]="$zpath/$zmsg - file not found!";
+    reports[${#reports[@]}]="$zmsg - file not found!";
     makeErr;
 fi
 
 # read msg
-if [[ ! $(cat $zpath/$zmsg|grep "$lang"|wc -m) == 0 ]]
+if [[ ! $(cat $zmsg|grep "$lang"|wc -m) == 0 ]]
     then
-        index_msg="$(cat $zpath/$zmsg | jq '."'$lang'".msg[]'|wc -l)";
+        index_msg="$(cat $zmsg | jq '."'$lang'".msg[]'|wc -l)";
         if [[ ! "$index_msg" == "0" ]]||[[ "$index_msg" == "${#set_msg[@]}" ]]
             then
                 for (( m_index=0; m_index != $index_msg; m_index++)) 
@@ -228,7 +227,7 @@ if [[ ! $(cat $zpath/$zmsg|grep "$lang"|wc -m) == 0 ]]
                 eval st_in_msg="(" ${set_msg[$m_index]} ")";
                 if [ "${st_in_msg[1]}" != "0" ]
                     then
-                    read_msg=$(cat $zpath/$zmsg | jq '."'$lang'".msg['$m_index']'| sed 's/\"//g');
+                    read_msg=$(cat $zmsg | jq '."'$lang'".msg['$m_index']'| sed 's/\"//g');
                     msg[$m_index]="$read_msg";
                     else
                     msg[$m_index]="";
@@ -236,7 +235,7 @@ if [[ ! $(cat $zpath/$zmsg|grep "$lang"|wc -m) == 0 ]]
                 done
             else
                 reports=();
-                reports[${#reports[@]}]="$zpath/$zmsg - Incorrect file format or empty!";
+                reports[${#reports[@]}]="$zmsg - Incorrect file format or empty!";
                 makeErr;
         fi
     fi
