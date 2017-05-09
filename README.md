@@ -14,8 +14,9 @@ BASH language code consists of 3 scripts:<br>
 
 # How to use:
 <hr>
-* zraid-install --install
-and..
+zraid-install --install<br>
+and..<br>
+
 1. Create an image of the required size, consider the size of allocated RAM to mirror your image!<br>
 example:<br>
  cat /proc/meminfo |grep MemAvailable<br>
