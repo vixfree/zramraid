@@ -49,6 +49,6 @@ To automatically start the system, you must correct the configuration file:<br>
  <hr>
 Additional control parameters can be found from the parameter --help<br>
 examle:<br>
-zraid-config --help
-zraid-maker --help
-zraid-install --help
+zraid-config --help<br>
+zraid-maker --help<br>
+zraid-install --help<br>
