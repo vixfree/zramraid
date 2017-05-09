@@ -9,7 +9,7 @@
 # Description:       starts zraid using start-stop-daemon
 ### END INIT INFO
 ## version =05.08
-## переменная управления
+## переменная управления 
 parms=$1
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 source "/etc/default/zraid";
