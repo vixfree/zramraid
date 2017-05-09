@@ -52,3 +52,11 @@ examle:<br>
  zraid-config --help<br>
  zraid-maker --help<br>
  zraid-install --help<br>
+ 
+ # Recommendations:
+ If you plan to use zram-raid together with KVM then we recommend making a change for the systemd:<br>
+ editor /lib/systemd/system/libvirt-guests.service<br>
+ ...<br>
+ After=network.target libvirtd.service time-sync.target zraid-start.service<br>
+ ...<br>
+ 
