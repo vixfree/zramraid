@@ -23,32 +23,32 @@ example:<br>
 or:<br>
  zraid-config --list<br>
 2. Create image:<br>
- fallocate -l 3G /home/kvm/disk0.img<br>
+  fallocate -l 3G /home/kvm/disk0.img<br>
 3. Create zram-raid:<br>
- zraid-config --add md0:/home/kvm/disk0.img<br>
+  zraid-config --add md0:/home/kvm/disk0.img<br>
 4. Check the configuration:<br>
- zraid-config --list<br>
+  zraid-config --list<br>
 5. Start or restart zram-raid:<br>
-/etc/init.d/zraid-manager restart<br>
+ /etc/init.d/zraid-manager restart<br>
 or:<br>
- systemctl restart zraid-manager<br>
+  systemctl restart zraid-manager<br>
 6. Result:<br>
- cat /proc/mdstat<br>
- Personalities : [raid1]<br>
- md0 : active raid1 zram0[2] loop0[1]<br>
-       3143680 blocks super 1.2 [2/2] [UU]<br>
+  cat /proc/mdstat<br>
+  Personalities : [raid1]<br>
+  md0 : active raid1 zram0[2] loop0[1]<br>
+      3143680 blocks super 1.2 [2/2] [UU]<br>
  <br>     
- unused devices: <none><br>
+  unused devices: <none><br>
 To automatically start the system, you must correct the configuration file:<br>
 
  editor /etc/defaults/zraid<br>
- ...<br>
- mode="auto";<br>
+  ...<br>
+  mode="auto";<br>
  <br>
  Now, when you start, ZRAM-RAID will start automatically.<br>
  <hr>
 Additional control parameters can be found from the parameter --help<br>
 examle:<br>
-zraid-config --help<br>
-zraid-maker --help<br>
-zraid-install --help<br>
+ zraid-config --help<br>
+ zraid-maker --help<br>
+ zraid-install --help<br>
