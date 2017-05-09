@@ -6,7 +6,7 @@ Before=local-fs.target shutdown.target
 Wants=systemd-udev-settle.service
 
 [Service]
-ExecStart=/etc/init.d/zraid-manager boot
+ExecStart=/etc/init.d/zraid-manager boot 
 ExecStop=/etc/init.d/zraid-manager stop
 Type=oneshot
 
