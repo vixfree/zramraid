@@ -40,8 +40,15 @@ or:<br>
  <br>     
  unused devices: <none><br>
 To automatically start the system, you must correct the configuration file:<br>
+
  editor /etc/defaults/zraid<br>
  ...<br>
  mode="auto";<br>
  <br>
- Now, when you start, ZRAM-RAID will start automatically.
+ Now, when you start, ZRAM-RAID will start automatically.<br>
+ <hr>
+Additional control parameters can be found from the parameter --help<br>
+examle:<br>
+zraid-config --help
+zraid-maker --help
+zraid-install --help
