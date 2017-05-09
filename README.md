@@ -13,3 +13,37 @@ BASH language code consists of 3 scripts:<br>
 2. zraid-config - script for configuration zraid media management<br>
 3. zraid-maker - starting and stopping control script zraid media<br>
 
+# How to use:
+1. Create an image of the required size, consider the size of allocated RAM to mirror your image!
+examle:
+ #cat /proc/meminfo |grep MemAvailable
+ MemAvailable:    6638832 kB
+or:
+ #zraid-config --list
+2. Create image:
+ #fallocate -l 3G /home/kvm/disk0.img
+3. Create zram-raid:
+ #zraid-config --add md0:/home/kvm/disk0.img
+4. Check the configuration:
+ #zraid-config --list
+5. Start or restart zram-raid:
+ #/etc/init.d/zraid-manager restart
+or
+ #systemctl restart zraid-manager
+6. Result:
+ #cat /proc/mdstat
+ Personalities : [raid1] 
+ md0 : active raid1 zram0[2] loop0[1]
+       3143680 blocks super 1.2 [2/2] [UU]
+       
+ unused devices: <none>
+To automatically start the system, you must correct the configuration file:
+ editor /etc/defaults/zraid
+ ...
+ ## service start
+ # mode - startup parameter zraid system in manual or automatic mode, examples: mode="auto" or mode="manual"
+ # if "manual" zraid does not start automatically at startup, dafult - "manual"
+ #
+ mode="auto";
+ 
+ Now, when you start, ZRAM-RAID will start automatically.
