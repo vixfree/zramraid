@@ -161,8 +161,8 @@ ln -s /etc/zraid/zraid-config /usr/local/bin/zraid-config;
 ## 4 deb 8.x end up
 if [ $(echo $debversion|grep jessie|wc -m) != 0 ]
     then
-cp -f $PWD/etc/lib/systemd/system/zraid-start.service /lib/systemd/system/zraid-start.service;
-cp -f $PWD/etc/lib/systemd/system/zraid-monitor.service /lib/systemd/system/zraid-monitor.service;
+cp -f $PWD/lib/systemd/system/zraid-start.service /lib/systemd/system/zraid-start.service;
+cp -f $PWD/lib/systemd/system/zraid-monitor.service /lib/systemd/system/zraid-monitor.service;
 /bin/systemctl enable zraid-manager;
 fi
 if [ $(echo $debversion|grep wheezy|wc -m) != 0 ]
