@@ -13,10 +13,9 @@ BASH language code consists of 3 scripts:<br>
 3. zraid-maker - starting and stopping control script zraid media<br>
 
 # How to use:
-<hr>
 zraid-install --install<br>
 and..<br>
-
+<hr>
 1. Create an image of the required size, consider the size of allocated RAM to mirror your image!<br>
 example:<br>
  cat /proc/meminfo |grep MemAvailable<br>
