@@ -48,7 +48,7 @@ To automatically start the system, you must correct the configuration file:<br>
  Now, when you start, ZRAM-RAID will start automatically.<br>
  <hr>
 Additional control parameters can be found from the parameter --help<br>
-examle:<br>
+example:<br>
  zraid-config --help<br>
  zraid-maker --help<br>
  zraid-install --help<br>
