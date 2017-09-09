@@ -1,6 +1,6 @@
 {
 "ru_RU.UTF-8":{
-	    "msg":[ 
+	    "msg":[  
 	    "Система zraid не запущена!",
 	    "Нет параметров для zraid-maker!",
 	    "Полный запуск системы zraid: zraid-maker --on",
