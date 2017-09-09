@@ -111,8 +111,7 @@
 	    "version zraid:",
 	    "I'm sorry the old kernel version! recommended 4.2 or higher for this option",
 	    "-device is already working",
-	    "kernel version does not allow selective media management, only a complete stop and start,
-        recommended 4.2 or higher for this option",
+	    "kernel version does not allow selective media management, only a complete stop and start, recommended 4.2 or higher for this option",
 	    "Selective startup zraid device: raid-maker --on md[x] - example: md1",
 	    "Selective stop zraid device: raid-maker --off md[x] - example: md1"
 	    ]
