@@ -11,3 +11,6 @@ DefaultDependencies=no
 
 [Service]
 ExecStart=/etc/init.d/zraid-manager status
+
+[Install]
+WantedBy=multi-user.target
