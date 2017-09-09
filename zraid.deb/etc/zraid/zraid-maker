@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 ## zraid-maker
 ## (c) author's idea and realization: Kleemov A. & Koshuba V.
 ## script author: Koshuba V - stvixfree@gmail.com
@@ -108,7 +108,7 @@ local exfunc=();
 for ((lg_index=0; lg_index != ${#iFs[@]}; lg_index++))
  do
     ## !! debug operation...
-    #echo "eXlogic = execution: function ${iFs[$lg_index]} : index=$lg_index";
+    ##echo "eXlogic = execution: function ${iFs[$lg_index]} : index=$lg_index";
     local lg=$(echo $((${iFs[$lg_index]})) );
     local exfunc=( ${logic[$lg_index]} );
     local runfunc=$(echo ${exfunc[$lg]}| sed 's/\"//g');
@@ -500,7 +500,6 @@ for ((crt_index=0; crt_index != ${#id_zmd[@]}; crt_index++))
 set_md_id=${id_zmd[$crt_index]};
 singleTestMd;
 local tstart_md=$(echo ${set_md_status[@]}|tr -d ' '|sed 's/\"//g');
-
 if [[ "$tstart_md" == "" ]] || [[ ! "$tstart_md" =~ ^([0-9]+)$ ]] || (( "$tstart_md" < "0" ))
 	then
 	    reports=();
@@ -758,7 +757,7 @@ echo  -e "${reports[@]}";
 function singleTestMd() {
 local check_md=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n 1|awk '{print$1}'|wc -m);
 local check_zram=$(cat /proc/mdstat |grep "md$set_md_id"|grep zram|wc -m);
-local check_conf=$(cat $zconfig|$_jq -c '.md[]."id"."'$set_md_id'"'|cat -n|grep [0]|sed 's/\[0]//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
+local check_conf=$(cat $zconfig|$_jq -c '.md[]."id"'|grep -e "$set_md_id"|cat -n|grep [0]|sed 's/\[0]//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
 
 iFs=(   "$check_md == 0"
         "$check_conf == 0"
@@ -832,7 +831,7 @@ fi
 for ((ex_index=0; ex_index != ${#execute_func[@]}; ex_index++))
  do
     ## !! debug operation...
-    #echo "execution: function ${execute_func[ex_index]}"
+    ##echo "execution: function ${execute_func[ex_index]}"
  ${execute_func[ex_index]};
 done
 }
