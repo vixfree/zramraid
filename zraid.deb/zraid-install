@@ -2,7 +2,7 @@
 ## zraid-install (Default for Debian & Ubuntu)
 ## (c) author's idea and realization: Kleemov A. & Koshuba V.
 ## script author: Koshuba V - stvixfree@gmail.com
-## version = 05.08
+## version = 300917
 option=$1;
 rdate=$(date +%c);
 reports=();
@@ -97,17 +97,17 @@ function makeErr() {
 ##@F-tests
 function checkMod() {
     if (( "${kernel_version[0]}" >= "3" ))
-        then
-            if (( ! "${kernel_version[1]}" >= "14" ))
-                then 
-            reports[${#reports[@]}]="Sorry Kernel version < 3.14.x";
-            makeErr;
-                exit 0;
-            fi
-        else
-            reports[${#reports[@]}]="Sorry Kernel version < 3.x";
-            makeErr;
-                exit 0;
+	then
+	    if (( ! "${kernel_version[1]}" >= "14" ))
+		then 
+	    reports[${#reports[@]}]="Sorry Kernel version < 3.14.x";
+	    makeErr;
+		exit 0;
+	    fi
+	else
+	    reports[${#reports[@]}]="Sorry Kernel version < 3.x";
+	    makeErr;
+		exit 0;
     fi
 # test module zram
 if [ $test_module == 0 ] 
@@ -149,7 +149,7 @@ fi
 function install() {
 if [ ! -d "/etc/zraid" ]
     then
-        mkdir -p /etc/zraid;
+	mkdir -p /etc/zraid;
 fi
 cp -f $PWD/etc/zraid/messages.dat /etc/zraid/messages.dat;
 cp -f $PWD/etc/zraid/zraid-config /etc/zraid/zraid-config;
@@ -179,13 +179,13 @@ printInfo;
 function uninstall() {
 
 function zrDel() {
-        rm -f /usr/local/bin/zraid-maker;
-        rm -f /usr/local/bin/zraid-config;
-        rm -f /etc/zraid/messages.dat;
-        rm -f /etc/zraid/zraid-config;
-        rm -f /etc/zraid/zraid-maker;
-        rm -f /etc/init.d/zraid-manager;
-        rm -f /etc/default/zraid;
+	rm -f /usr/local/bin/zraid-maker;
+	rm -f /usr/local/bin/zraid-config;
+	rm -f /etc/zraid/messages.dat;
+	rm -f /etc/zraid/zraid-config;
+	rm -f /etc/zraid/zraid-maker;
+	rm -f /etc/init.d/zraid-manager;
+	rm -f /etc/default/zraid;
     }
 
 if [ ! -f "/etc/zraid/zraid.conf" ]
@@ -257,4 +257,3 @@ executor;
 exit 1
 ;;
 esac
-
