@@ -6,7 +6,7 @@
 option=$1;
 params=$2;
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zraid";
-version="05.08";
+version="300917";
 ## msg [53]
 set_msg=( '"0" "1"' '"1" "1"' '"2" "1"' '"3" "1"' '"4" "1"' '"5" "1"' '"6" "1"' '"7" "1"' '"8" "1"' 
         '"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "1"' 
@@ -510,11 +510,22 @@ if [[ "$tstart_md" == "001" ]]
     then
     check_start=$(echo $(($check_start+1)));
     zblock_dev=$((${size_zmd[$crt_index]}));
-    echo $zblock_dev > /sys/block/zram$crt_index/disksize;
     losetup -f "${image_zmd[$crt_index]}";
+    echo $zblock_dev > /sys/block/zram$crt_index/disksize;
     on_loop=$(losetup -a |grep "${image_zmd[$crt_index]}"|awk '{print$1}'|sed 's/\://g');
-    echo -e "y"|sudo mdadm --create /dev/md/${id_zmd[$crt_index]} --auto=yes --level=1 --raid-devices=2 missing $on_loop;
-    mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
+
+    if [[ "$(mdadm --examine $on_loop|grep Name|awk '{print$3}'|sed 's/'"$HOSTNAME"'://g'|wc -m )" == "0" ]]
+	then
+	echo -e "y"|sudo mdadm --create /dev/md${id_zmd[$crt_index]} --auto=yes --level=1 --raid-devices=2 missing $on_loop;
+	mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
+	else
+	    if [[ "$(sfdisk -d $on_loop|wc -m)" != "0" ]]
+		then
+		sfdisk -d $on_loop|sfdisk -f /dev/zram$crt_index;
+	    fi
+	echo -e "y"|mdadm -A --force /dev/md${id_zmd[$crt_index]} --update=name $on_loop;
+	mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
+	fi
 fi
 done
 if (( "$check_start" >"0" ))
@@ -550,7 +561,7 @@ if [[ "$tstop_md" == "111" ]]||[[ "$tstop_md" == "101" ]]
 check_stop=$(echo $(($check_stop+1)));
 local off_set_loop=$(losetup -a |grep "${image_zmd[$off_index]}"|awk '{print$1}'|sed 's/\://g');
 local off_set_zraid=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n1|awk '{print$5}'|sed 's/\[2]//g');
-mdadm -S /dev/md/$set_md_id;
+mdadm -S /dev/md$set_md_id;
     if [[ "$off_set_loop" ]]
 	then
 	losetup -d $off_set_loop;
@@ -681,8 +692,18 @@ fi
 local set_zram_id="$(echo $(($(ls /dev/zram*|sed 's/\dev//g'|sed 's/\zram//g'|sed 's/\///g'|tr -d '\r\n'|wc -c)-1)))";
 local zset_block_dev=$(stat -c%s "$on_set_image");
 echo $zset_block_dev > /sys/block/zram$set_zram_id/disksize;
-echo -e "y"|sudo mdadm --create /dev/md/$set_md_id --auto=yes --level=1 --raid-devices=2 missing $on_set_loop;
-mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
+    if [[ "$(mdadm --examine $on_set_loop|grep Name|awk '{print$3}'|sed 's/'"$HOSTNAME"'://g'|wc -m )" == "0" ]]
+	then
+	echo -e "y"|sudo mdadm --create /dev/md$set_md_id --auto=yes --level=1 --raid-devices=2 missing $on_set_loop;
+	mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
+	else
+	    if [[ "$(sfdisk -d $on_set_loop|wc -m)" != "0" ]]
+		then
+		sfdisk -d $on_set_loop|sfdisk -f /dev/zram$set_zram_id;
+	    fi
+	echo -e "y"|mdadm -A --force /dev/md$set_md_id  --update=name $on_set_loop;
+	mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
+	fi
 }
 eXlogic;
 reports[${#reports[@]}]="${msg[43]} : start - /dev/md$set_md_id";
@@ -739,7 +760,7 @@ function stopSmd () {
 lEnd=0;
 local off_set_loop="/dev/$(ls /sys/block/"md$set_md_id"/md/|grep loop|sed 's/dev-//g')";
 local off_set_zraid=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n1|awk '{print$5}'|sed 's/\[2]//g');
-mdadm -S /dev/md/$set_md_id;
+mdadm -S /dev/md$set_md_id;
 
 echo $(echo $off_set_zraid|sed 's/\dev//g'|sed 's/\zram//g'|sed 's/\///g') > /sys/class/zram-control/hot_remove;
 if [[ $off_set_loop ]]
@@ -757,7 +778,7 @@ echo  -e "${reports[@]}";
 function singleTestMd() {
 local check_md=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n 1|awk '{print$1}'|wc -m);
 local check_zram=$(cat /proc/mdstat |grep "md$set_md_id"|grep zram|wc -m);
-local check_conf=$(cat $zconfig|$_jq -c '.md[]."id"'|grep -e "$set_md_id"|cat -n|grep [0]|sed 's/\[0]//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
+local check_conf=$(cat $zconfig|$_jq -c '.md[]."id"'|grep -e "$set_md_id"|sed 's/\"//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
 
 iFs=(   "$check_md == 0"
         "$check_conf == 0"
