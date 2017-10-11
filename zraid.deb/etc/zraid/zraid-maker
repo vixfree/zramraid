@@ -6,7 +6,7 @@
 option=$1;
 params=$2;
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zraid";
-version="300917";
+version="111017";
 ## msg [53]
 set_msg=( '"0" "1"' '"1" "1"' '"2" "1"' '"3" "1"' '"4" "1"' '"5" "1"' '"6" "1"' '"7" "1"' '"8" "1"' 
         '"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "1"' 
@@ -49,6 +49,7 @@ kernel_status=();									# [0]-kernel3x,[1]-kernel4x
 set_md_id="";
 set_zram_id="";
 set_md_status=();									# [0]-on\off,[1]-load zram,[2]-in config
+set_prepare="";										# 0 - new md, 1 - md assemble
 ##
 _blkid=$(whereis -b blkid|awk '/^blkid:/{print $2}');
 _jq=$(whereis -b jq|awk '/^jq:/{print $2}');
@@ -59,7 +60,7 @@ operation_on=( "checkDep" "loadMsg" "testId" "confRead" "checkModule" "testMd" "
 operation_sign_on=(  "checkDep" "loadMsg" "testId" "confRead" "checkModule" "testImage" "inParams" "singleTestMd" "singleStart" );
 operation_sign_off=(  "checkDep" "loadMsg" "testId" "confRead" "checkModule" "testImage" "inParams" "singleTestMd" "singleStop" );
 operation_off=( "checkDep" "loadMsg" "testId" "confRead" "checkModule" "offZraid" );
-operation_status=( "checkDep" "loadMsg" "testId" "confRead"  "statusZraid" );
+operation_status=( "checkDep" "loadMsg" "testId" "confRead" "statusZraid" );
 operation_help=( "clear" "checkDep" "loadMsg" "printInfo" );
 execute_func=();
 
@@ -164,7 +165,7 @@ logic=( '"" "pInone"'
 
 function pInone() {
     lEnd=0;
-    clear
+    ##clear
     echo
     echo -e ${msg[1]}"\n"${msg[2]}"\n"${msg[3]}"\n"${msg[4]}"\n"${msg[5]};
     echo -e ${msg[52]}"\n"${msg[53]};
@@ -174,7 +175,7 @@ function pInone() {
 
 function pIhelp() {
     lEnd=0;
-    clear
+    ##clear
     echo
     echo -e ${msg[2]}"\n"${msg[3]}"\n"${msg[4]}"\n"${msg[5]};
     echo -e ${msg[51]}"\n"${msg[52]}
@@ -499,6 +500,7 @@ for ((crt_index=0; crt_index != ${#id_zmd[@]}; crt_index++))
     do
 set_md_id=${id_zmd[$crt_index]};
 singleTestMd;
+
 local tstart_md=$(echo ${set_md_status[@]}|tr -d ' '|sed 's/\"//g');
 if [[ "$tstart_md" == "" ]] || [[ ! "$tstart_md" =~ ^([0-9]+)$ ]] || (( "$tstart_md" < "0" ))
 	then
@@ -510,24 +512,23 @@ if [[ "$tstart_md" == "001" ]]
     then
     check_start=$(echo $(($check_start+1)));
     zblock_dev=$((${size_zmd[$crt_index]}));
-    losetup -f "${image_zmd[$crt_index]}";
     echo $zblock_dev > /sys/block/zram$crt_index/disksize;
-    on_loop=$(losetup -a |grep "${image_zmd[$crt_index]}"|awk '{print$1}'|sed 's/\://g');
-
-    if [[ "$(mdadm --examine $on_loop|grep Name|awk '{print$3}'|sed 's/'"$HOSTNAME"'://g'|wc -m )" == "0" ]]
-	then
-	echo -e "y"|sudo mdadm --create /dev/md${id_zmd[$crt_index]} --auto=yes --level=1 --raid-devices=2 missing $on_loop;
-	mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
-	else
-	    if [[ "$(sfdisk -d $on_loop|wc -m)" != "0" ]]
-		then
-		sfdisk -d $on_loop|sfdisk -f /dev/zram$crt_index;
-	    fi
-	echo -e "y"|mdadm -A --force /dev/md${id_zmd[$crt_index]} --update=name $on_loop;
-	mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
-	fi
+    on_loop=$(losetup -f "${image_zmd[$crt_index]}" && losetup -a |grep "${image_zmd[$crt_index]}"|awk '{print$1}'|sed 's/\://g');
+#
+set_image_name=${image_zmd[$crt_index]};
+prepareMd;
+#
+if [[ $set_prepare == "0" ]]
+    then
+	echo -e "y"|mdadm --create /dev/md${id_zmd[$crt_index]} --auto=yes --metadata=1.2 --level=raid1 --raid-devices=2 missing $on_loop;
+        echo -e "y"|mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
+    else
+        echo -e "y"|mdadm --create /dev/md${id_zmd[$crt_index]} --assume-clean --auto=yes --metadata=1.2 --level=raid1 --raid-devices=2 missing $on_loop;
+        echo -e "y"|mdadm --add /dev/md${id_zmd[$crt_index]}  /dev/zram$crt_index;
+    fi
 fi
 done
+
 if (( "$check_start" >"0" ))
     then
     reports[${#reports[@]}]=${msg[16]};
@@ -692,18 +693,18 @@ fi
 local set_zram_id="$(echo $(($(ls /dev/zram*|sed 's/\dev//g'|sed 's/\zram//g'|sed 's/\///g'|tr -d '\r\n'|wc -c)-1)))";
 local zset_block_dev=$(stat -c%s "$on_set_image");
 echo $zset_block_dev > /sys/block/zram$set_zram_id/disksize;
-    if [[ "$(mdadm --examine $on_set_loop|grep Name|awk '{print$3}'|sed 's/'"$HOSTNAME"'://g'|wc -m )" == "0" ]]
-	then
-	echo -e "y"|sudo mdadm --create /dev/md$set_md_id --auto=yes --level=1 --raid-devices=2 missing $on_set_loop;
-	mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
-	else
-	    if [[ "$(sfdisk -d $on_set_loop|wc -m)" != "0" ]]
-		then
-		sfdisk -d $on_set_loop|sfdisk -f /dev/zram$set_zram_id;
-	    fi
-	echo -e "y"|mdadm -A --force /dev/md$set_md_id  --update=name $on_set_loop;
-	mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
-	fi
+#
+set_image_name=$on_set_image;
+prepareMd;
+#
+if [[ $set_prepare == "0" ]]
+    then
+	echo -e "y"|mdadm --create /dev/md$set_md_id --auto=yes --metadata=1.2 --level=raid1 --raid-devices=2 missing $on_set_loop;
+        echo -e "y"|mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
+    else
+        echo -e "y"|mdadm --create /dev/md$set_md_id --assume-clean --auto=yes --metadata=1.2 --level=raid1 --raid-devices=2 missing $on_set_loop;
+        echo -e "y"|mdadm --add /dev/md$set_md_id  /dev/zram$set_zram_id;
+    fi
 }
 eXlogic;
 reports[${#reports[@]}]="${msg[43]} : start - /dev/md$set_md_id";
@@ -813,6 +814,18 @@ logic=( '"statusOn" "statusOff"'                                                
 	set_md_status[2]="0";
     }
 eXlogic;
+}
+
+##..........................................................................................
+function prepareMd() {
+local check_loop=$(losetup -a |grep "$set_image_name"|awk '{print$1}'|sed 's/\/dev\/\|s//g;s/\://g');
+if (( $(cat /proc/mdstat |grep "$check_loop"|awk '{print$1}'|wc -m) != "0" ))
+    then
+    mdadm -S /dev/$(cat /proc/mdstat |grep "$check_loop"|awk '{print$1}');
+    set_prepare="1";
+    else
+    set_prepare="0";
+fi
 }
 
 ##...........................................................................................
