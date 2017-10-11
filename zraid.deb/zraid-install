@@ -2,7 +2,7 @@
 ## zraid-install (Default for Debian & Ubuntu)
 ## (c) author's idea and realization: Kleemov A. & Koshuba V.
 ## script author: Koshuba V - stvixfree@gmail.com
-## version = 300917
+## version = 11.10
 option=$1;
 rdate=$(date +%c);
 reports=();
@@ -163,7 +163,8 @@ if [ $(echo $debversion|grep jessie|wc -m) != 0 ]
     then
 cp -f $PWD/lib/systemd/system/zraid-start.service /lib/systemd/system/zraid-start.service;
 cp -f $PWD/lib/systemd/system/zraid-monitor.service /lib/systemd/system/zraid-monitor.service;
-/bin/systemctl enable zraid-manager;
+/bin/systemctl enable zraid-start.service;
+/bin/systemctl enable zraid-monitor.service;
 fi
 if [ $(echo $debversion|grep wheezy|wc -m) != 0 ]
     then
@@ -179,6 +180,19 @@ printInfo;
 function uninstall() {
 
 function zrDel() {
+if [ $(echo $debversion|grep jessie|wc -m) != 0 ]
+    then
+/bin/systemctl stop zraid-manager;
+/bin/systemctl disable zraid-start.service;
+/bin/systemctl disable zraid-monitor.service;
+rm /lib/systemd/system/zraid-start.service;
+rm /lib/systemd/system/zraid-monitor.service;
+fi
+if [ $(echo $debversion|grep wheezy|wc -m) != 0 ]
+    then
+    /etc/init.d/zraid-manager stop;
+    update-rc.d -n zraid-manager remove;
+fi
 	rm -f /usr/local/bin/zraid-maker;
 	rm -f /usr/local/bin/zraid-config;
 	rm -f /etc/zraid/messages.dat;
