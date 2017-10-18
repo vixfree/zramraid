@@ -514,25 +514,15 @@ jq '.'>$zpath/$tdate$zconfig && cat $zpath/$tdate$zconfig>$zpath/$zconfig && rm 
 ## del md from config
 function delMd() {
 local tdate=$(date +%j);
-local del_index=$(cat $zpath/$zconfig|jq -c '.md[]."id"."'$set_id'"'|cat -n|grep [0]|sed 's/\[0]//g'|sed 's/^[ \t]*//;s/[ \t]*$//');
-
-if [[ ! "$del_index"  =~ ^([0-9]+)$ ]]
+local del_value=$(cat $zpath/$zconfig|jq -c '.md[]|select (.id == "'$set_id'")');
+#'
+if [[ ! "$del_value" ]]
 	then 
 	    reports=();
-	reports[${#reports[@]}]="${msg[29]}: md$set_id - ${msg[12]}";
+	reports[${#reports[@]}]="${msg[29]}: md$set_id - ${msg[9]}";
 	makeErr;
 	else
-	del_index=$(($del_index-1));
-fi
-
-if [ $del_index ]&&[ ! $del_index == -1 ]
-    then 
-	cat $zpath/$zconfig|jq -c ' del (.md['$del_index'])'|
-	jq '.'>$zpath/$tdate$zconfig && cat $zpath/$tdate$zconfig>$zpath/$zconfig && rm -f $zpath/$tdate$zconfig;
-    else
-    reports=();
-	reports[${#reports[@]}]="${msg[44]}md$set_id";
-	makeErr;
+	cat $zpath/$zconfig|jq -c '.md|=.-['$del_value']'|jq '.'>$zpath/$tdate$zconfig && cat $zpath/$tdate$zconfig>$zpath/$zconfig && rm -f $zpath/$tdate$zconfig;
 fi
 }
 
