@@ -7,7 +7,7 @@
 option=$1;
 params=$2;
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zraid";
-version="191017";
+version="10.03.18";
 ## msg [53]
 set_msg=( '"0" "0"' '"1" "0"' '"2" "0"' '"3" "0"' '"4" "0"' '"5" "0"' '"6" "1"' '"7" "1"' '"8" "1"' 
 	'"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "0"' 
@@ -20,7 +20,6 @@ msg=();
 ###
 lang=$(locale|grep LANG=|sed 's/\LANG=//g');
 rdate=$(date +%c);
-test_jq=$(apt-cache policy jq | grep status);
 ##
 total_mem=$(cat /proc/meminfo |awk '/^MemTotal:/{print $2}');
 free_mem=$(cat /proc/meminfo |awk '/^MemAvailable:/{print $2}');
@@ -46,7 +45,8 @@ set_opt=( "0" "0" "0" "0" );
 set_size_limit=0;
 set_type_limit="";
 ##
-_blkid=$(whereis -b blkid|awk '/^blkid:/{print $2}');
+zr_blkid=$(whereis -b blkid|awk '/^blkid:/{print $2}');
+zr_jq=$(whereis -b jq|awk '/^jq:/{print $2}');
 
 ## functions & operations
 operation_createdef=( "checkDep" "loadMsg" "testId" "confEmpty" );
@@ -197,7 +197,7 @@ eXlogic;
 ##--@F Check the program dependency
 function checkDep() {
 # This installation check jq
-if [ ! "$test_jq" ]
+if [ $(echo $zr_jq|grep jq|wc -m) = 0 ]
     then
     ## lang messages if yes then lang else us...
     reports=();
@@ -319,7 +319,7 @@ if (( "$set_id" < 0 ))||[[ "$set_id" == "" ]]||[[ ! "$set_id" =~ ^([0-9]+)$ ]]
 	reports[${#reports[@]}]="${msg[21]}$set_id - ${msg[10]}";
 	makeErr;
     fi
-    if [ "$($_blkid /dev/md$set_id|grep $set_id)" ]
+    if [ "$($zr_blkid /dev/md$set_id|grep $set_id)" ]
 	then
 	reports=(); 
 	reports[${#reports[@]}]="${msg[21]}$set_id - ${msg[11]}";

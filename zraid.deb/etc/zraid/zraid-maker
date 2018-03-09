@@ -6,7 +6,7 @@
 option=$1;
 params=$2;
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zraid";
-version="111017";
+version="10.03.18";
 ## msg [53]
 set_msg=( '"0" "1"' '"1" "1"' '"2" "1"' '"3" "1"' '"4" "1"' '"5" "1"' '"6" "1"' '"7" "1"' '"8" "1"' 
         '"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "1"' 
@@ -22,8 +22,6 @@ lang=$(locale|grep LANG=|sed 's/\LANG=//g');
 rdate=$(date +%c);
 eval kernel_version="(" $(uname -r|sed 's/\./ /g'|awk '{print$1" "$2}') ")";
 test_module=$(find /lib/modules/$(uname -r) -name '*.ko'|grep zram|wc -m);
-test_jq=$(apt-cache policy jq | grep status);
-test_mdadm=$(apt-cache policy mdadm | grep status);
 ##
 total_mem=$(cat /proc/meminfo |awk '/^MemTotal:/{print $2}');
 free_mem=$(cat /proc/meminfo |awk '/^MemAvailable:/{print $2}');
@@ -51,8 +49,9 @@ set_zram_id="";
 set_md_status=();									# [0]-on\off,[1]-load zram,[2]-in config
 set_prepare="";										# 0 - new md, 1 - md assemble
 ##
-_blkid=$(whereis -b blkid|awk '/^blkid:/{print $2}');
-_jq=$(whereis -b jq|awk '/^jq:/{print $2}');
+zr_blkid=$(whereis -b blkid|awk '/^blkid:/{print $2}');
+zr_jq=$(whereis -b jq|awk '/^jq:/{print $2}');
+zr_mdadm=$(whereis -b mdadm|awk '/^mdadm:/{print $2}');
 
 ## functions & operations
 operation_test=( "clear" "checkDep" "loadMsg" "testId" "checkModule" "confRead" "testMd" "testImage" "reportConf" "printInfo" );
@@ -214,15 +213,15 @@ eXlogic;
 
 ##--@F Check the program dependency
 function checkDep() {
-# This installation check $_jq
-if [ ! "$test_jq" ]
+# This installation check $zr_jq
+if [ $(echo $zr_jq|grep jq|wc -m) = 0 ]
     then
     ## lang messages if yes then lang else us...
     reports[${#reports[@]}]=${msg[6]};
     makeErr
 fi
 # This installation check mdadm
-if [ ! "$test_mdadm" ]
+if [ $(echo $zr_mdadm|grep mdadm|wc -m) = 0 ]
     then
     reports[${#reports[@]}]=${msg[8]};
     makeErr
@@ -248,7 +247,7 @@ fi
 # read msg
 if [[ ! $(cat $zmsg|grep "$lang"|wc -m) == 0 ]]
     then
-        index_msg="$(cat $zmsg | $_jq '."'$lang'".msg[]'|wc -l)";
+        index_msg="$(cat $zmsg | jq '."'$lang'".msg[]'|wc -l)";
         if [[ ! "$index_msg" == "0" ]]||[[ "$index_msg" == "${#set_msg[@]}" ]]
             then
                 for (( m_index=0; m_index != $index_msg; m_index++)) 
@@ -256,7 +255,7 @@ if [[ ! $(cat $zmsg|grep "$lang"|wc -m) == 0 ]]
                 eval st_in_msg="(" ${set_msg[$m_index]} ")";
                 if [ "${st_in_msg[1]}" != "0" ]
                     then
-                    read_msg=$(cat $zmsg | $_jq '."'$lang'".msg['$m_index']'| sed 's/\"//g');
+                    read_msg=$(cat $zmsg | jq '."'$lang'".msg['$m_index']'| sed 's/\"//g');
                     msg[$m_index]="$read_msg";
                     else
                     msg[$m_index]="";
@@ -328,13 +327,13 @@ fi
 # read config
 for (( rd_index=0; rd_index !=${#zdm_vars[@]}; rd_index++)) 
  do
-    read_key=$(cat $zconfig | $_jq '.md[].'${json_key[$rd_index]}| sed 's/\"//g');
+    read_key=$(cat $zconfig | jq '.md[].'${json_key[$rd_index]}| sed 's/\"//g');
     eval ${zdm_vars[$rd_index]}="(" $read_key ")";
 done
-log=$(cat $zconfig | $_jq '.log'| sed 's/\"//g');
+log=$(cat $zconfig | jq '.log'| sed 's/\"//g');
 
 ## test free memory
-value_mem=$(cat $zconfig | $_jq '.limit_free_mem.value_size'| sed 's/\"//g');
+value_mem=$(cat $zconfig | jq '.limit_free_mem.value_size'| sed 's/\"//g');
 
 value_in="$value_mem";
 iFs=(   "$(echo -n $value_in|wc -m) == 0"
@@ -355,7 +354,7 @@ lEnd=0;
 test_read_mem=0;
 input_unit=( "$free_mem" "test_read_mem" );
 Kb;
-math_unit=$(echo "scale=2; $(echo "scale=2; $test_read_mem/100"|bc -lq)*$(cat $zconfig | $_jq '.limit_free_mem.size'| sed 's/\"//g')"|bc -lq|sed 's/\./ /g'|awk '{print$1}');
+math_unit=$(echo "scale=2; $(echo "scale=2; $test_read_mem/100"|bc -lq)*$(cat $zconfig | jq '.limit_free_mem.size'| sed 's/\"//g')"|bc -lq|sed 's/\./ /g'|awk '{print$1}');
 ## -"
 
 if (( "$math_unit" < 0 ))||[[ "$math_unit" == "" ]]||[[ ! "$math_unit" =~ ^([0-9]+)$ ]]
@@ -375,7 +374,7 @@ fi
 
 lmem_Kb() {
 lEnd=0;
-input_unit=( "$(cat $zconfig | $_jq '.limit_free_mem.size'| sed 's/\"//g')" "math_unit" );
+input_unit=( "$(cat $zconfig | jq '.limit_free_mem.size'| sed 's/\"//g')" "math_unit" );
 Kb;
 limit_mem=$math_unit;
 input_unit=( "$math_unit" "info_limit_mem");
@@ -399,7 +398,7 @@ for (( md_index=0; md_index != ${#id_zmd[@]}; md_index++))
 	makeErr;
     fi
 ###
-    if [ "$($_blkid /dev/md${id_zmd[$md_index]}|grep ${id_zmd[$md_index]})" ]
+    if [ "$($zr_blkid /dev/md${id_zmd[$md_index]}|grep ${id_zmd[$md_index]})" ]
 	then reports[${#reports[@]}]="${msg[21]}${id_zmd[$md_index]} - ${msg[11]}";
 	makeErr;
     fi
@@ -681,7 +680,7 @@ function noConfSmd() {
 
 function startSmd () {
 lEnd=0;
-local on_set_image="$(cat $zconfig|$_jq -c '.md[]|select(.id == "'$set_md_id'")|.image'|sed 's/\"//g' )";
+local on_set_image="$(cat $zconfig|jq -c '.md[]|select(.id == "'$set_md_id'")|.image'|sed 's/\"//g' )";
 local on_set_loop="$(losetup -f)";
 losetup "$on_set_loop" "$on_set_image";
 if (( $(lsmod|grep zram|wc -m) != 0 ))
@@ -779,7 +778,7 @@ echo  -e "${reports[@]}";
 function singleTestMd() {
 local check_md=$(cat /proc/mdstat |grep "md$set_md_id"|tail -n 1|awk '{print$1}'|wc -m);
 local check_zram=$(cat /proc/mdstat |grep "md$set_md_id"|grep zram|wc -m);
-local check_conf=$(cat $zconfig|$_jq -c '.md[]."id"'|grep -e "$set_md_id"|sed 's/\"//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
+local check_conf=$(cat $zconfig|jq -c '.md[]."id"'|grep -e "$set_md_id"|sed 's/\"//g'|sed 's/^[ \t]*//;s/[ \t]*$//'|wc -m);
 
 iFs=(   "$check_md == 0"
         "$check_conf == 0"

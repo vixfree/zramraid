@@ -2,7 +2,7 @@
 ## zraid-install (Default for Debian & Ubuntu)
 ## (c) author's idea and realization: Kleemov A. & Koshuba V.
 ## script author: Koshuba V - stvixfree@gmail.com
-## version = 11.10
+## version = 10.03.18
 option=$1;
 rdate=$(date +%c);
 reports=();
