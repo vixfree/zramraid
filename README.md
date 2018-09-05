@@ -1,4 +1,4 @@
-# PROJECT ZRAM-RAID
+# PROJECT ZRAMRAID
 
 Description<br>
 This project is a derivative of all the experiments using virtualization XEN \ KVM, which we started in 2012. Then we did not like the speed of the disk subsystem in HVM mode for WINDOWS 2003-2012 servers.<br>
@@ -9,11 +9,11 @@ The code is distributed under the GNU Public License.<br>
 <br>
 BASH language code consists of 3 scripts:<br>
 1. install - installer script installer supports OS Debian<br>
-2. zraid-config - script for configuration zraid media management<br>
-3. zraid-maker - starting and stopping control script zraid media<br>
+2. zramraid-config - script for configuration zraid media management<br>
+3. zramraid-maker - starting and stopping control script zraid media<br>
 
 # How to use:
-zraid-install --install<br>
+zramraid-install --install<br>
 and..<br>
 <hr>
 1. Create an image of the required size, consider the size of allocated RAM to mirror your image!<br>
@@ -21,17 +21,17 @@ example:<br>
  cat /proc/meminfo |grep MemAvailable<br>
  MemAvailable:    6638832 kB<br>
 or:<br>
- zraid-config --list<br>
+ zramraid-config --list<br>
 2. Create image:<br>
   fallocate -l 3G /home/kvm/disk0.img<br>
-3. Create zram-raid:<br>
-  zraid-config --add md0:/home/kvm/disk0.img<br>
+3. Create zramraid:<br>
+  zramraid-config --add md0:/home/kvm/disk0.img<br>
 4. Check the configuration:<br>
-  zraid-config --list<br>
-5. Start or restart zram-raid:<br>
- /etc/init.d/zraid-manager restart<br>
+  zramraid-config --list<br>
+5. Start or restart zramraid:<br>
+ /etc/init.d/zramraid-manager restart<br>
 or:<br>
-  systemctl restart zraid-manager<br>
+  systemctl restart zramraid-manager<br>
 6. Result:<br>
   cat /proc/mdstat<br>
   Personalities : [raid1]<br>
@@ -41,25 +41,27 @@ or:<br>
   unused devices: <none><br>
 To automatically start the system, you must correct the configuration file:<br>
 
- editor /etc/defaults/zraid<br>
+ editor /etc/defaults/zramraid<br>
   ...<br>
   mode="auto";<br>
  <br>
- Now, when you start, ZRAM-RAID will start automatically.<br>
+ Now, when you start, zramraid will start automatically.<br>
  <hr>
 Additional control parameters can be found from the parameter --help<br>
 example:<br>
- zraid-config --help<br>
- zraid-maker --help<br>
- zraid-install --help<br>
+ zramraid-config --help<br>
+ zramraid-maker --help<br>
+ zramraid-install --help<br>
  
  # Recommendations:
- If you plan to use zram-raid together with KVM then we recommend making a change for the systemd:<br>
+ If you plan to use zramraid together with KVM then we recommend making a change for the systemd:<br>
  editor /lib/systemd/system/libvirt-guests.service<br>
  ...<br>
- After=network.target libvirtd.service time-sync.target zraid-start.service<br>
+ Requires=zramraid.service<br>
  ...<br>
  
 * see example files from /lib/systemd/system
 <hr>
-version - 10.09.18
+version - 27.06.18
+<hr>
+License: GPLv3

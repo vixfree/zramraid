@@ -1,18 +1,17 @@
 #!/bin/bash
-## zraid-install (Default for Debian & Ubuntu)
+## zramraid-install (Default for Debian & Ubuntu)
 ## (c) author's idea and realization: Kleemov A. & Koshuba V.
 ## script author: Koshuba V - stvixfree@gmail.com
-## version = 10.03.18
+## version = 26.06.18
+## License: GPLv3
 option=$1;
 rdate=$(date +%c);
 reports=();
+getpkg=( "jq" "mdadm" "lsb-release" );
 test_module=$(find /lib/modules/$kernel_version -name '*.ko'|grep zram|wc -m);
-test_jq=$(apt-cache policy jq | grep status);
-test_mdadm=$(apt-cache policy mdadm | grep status);
-test_lsb_release=$(apt-cache policy lsb-release | grep status);
 log="/var/log/syslog";
 eval kernel_version="(" $(uname -r|sed 's/\./ /g') ")";
-debversion=$(lsb_release -c);
+deb_release=""
 ## functions & operations
 operation_install=( "clear" "testId" "checkDep" "checkMod" "install" "printInfo" );
 operation_uninstall=( "clear" "testId" "checkDep" "checkMod" "uninstall" "printInfo" );
@@ -50,7 +49,7 @@ value_in="";
 function writeToLog() {
 for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
 do
-    echo  "$rdate zraid install  message: ${reports[$rpt_index]}">>$log;
+    echo  "$rdate zramraid install  message: ${reports[$rpt_index]}">>$log;
 done
 }
 
@@ -68,9 +67,9 @@ function pIhelp() {
     lEnd=0;
     clear
     echo
-    echo -e "install: zraid-install --install";
-    echo -e "uninstall: zraid-install --uninstall";
-    echo -e "help: zraid-install --help";
+    echo -e "install: zramraid-install --install";
+    echo -e "uninstall: zramraid-install --uninstall";
+    echo -e "help: zramraid-install --help";
     exit 0;
 }
 
@@ -120,59 +119,53 @@ fi
 
 ##--@F Check the program dependency
 function checkDep() {
-# This installation check jq
-if [ ! "$test_jq" ]
+if [[ ! $(apt-cache policy ${getpkg[@]} | grep status|wc -l) = $(echo -e ${#getpkg[@]}) ]];
+    then apt-get install $(echo ${getpkg[@]});
+fi
+
+for ((ipkg=0; ipkg != ${#getpkg[@]}; ipkg++))
+ do
+    if [ ! "$(apt-cache policy ${getpkg[$ipkg]} | grep status)" ]
     then
     ## lang messages if yes then lang else us...
-    reports[${#reports[@]}]="Do not set jq package";
+    reports[${#reports[@]}]="Do not set ${getpkg[$ipkg]} package";
     makeErr;
 fi
-# This installation check mdadm
-if [ ! "$test_mdadm" ]
-    then
-    reports[${#reports[@]}]="Do not set mdadm package";
-    makeErr;
-fi
-
-# This installation check mdadm
-if [ ! "$test_lsb_release" ]
-    then
-    reports[${#reports[@]}]="Do not set lsb_release package";
-    makeErr;
-fi
-
-## check Debian or Ubuntu...
-##
+done
+local lsbtools=$(whereis -b lsb_release|awk '/^lsb_release:/{print $2}');
+deb_release=$( $lsbtools -r|awk '/^Release:/{print $2}'|sed 's/\./ /g'|awk '{print$1}' );
 }
 
 
 function install() {
-if [ ! -d "/etc/zraid" ]
+if [ ! -d "/etc/zramraid" ]
     then
-	mkdir -p /etc/zraid;
+	mkdir -p /etc/zramraid;
 fi
-cp -f $PWD/etc/zraid/messages.dat /etc/zraid/messages.dat;
-cp -f $PWD/etc/zraid/zraid-config /etc/zraid/zraid-config;
-cp -f $PWD/etc/zraid/zraid-maker /etc/zraid/zraid-maker;
-cp -f $PWD/etc/init.d/zraid-manager /etc/init.d/zraid-manager;
-cp -f $PWD/etc/default/zraid /etc/default/zraid;
-ln -s /etc/zraid/zraid-maker /usr/local/bin/zraid-maker;
-ln -s /etc/zraid/zraid-config /usr/local/bin/zraid-config;
-## 4 deb 8.x end up
-if [ $(echo $debversion|grep jessie|wc -m) != 0 ]
-    then
-cp -f $PWD/lib/systemd/system/zraid-start.service /lib/systemd/system/zraid-start.service;
-cp -f $PWD/lib/systemd/system/zraid-monitor.service /lib/systemd/system/zraid-monitor.service;
-/bin/systemctl enable zraid-start.service;
-/bin/systemctl enable zraid-monitor.service;
+cp -f $PWD/etc/zramraid/messages.dat /etc/zramraid/messages.dat;
+cp -f $PWD/etc/zramraid/zramraid-config /etc/zramraid/zramraid-config;
+cp -f $PWD/etc/zramraid/zramraid-maker /etc/zramraid/zramraid-maker;
+cp -f $PWD/etc/init.d/zramraid-manager /etc/init.d/zramraid-manager;
+cp -f $PWD/etc/default/zramraid /etc/default/zramraid;
+ln -s /etc/zramraid/zramraid-maker /usr/local/bin/zramraid-maker;
+ln -s /etc/zramraid/zramraid-config /usr/local/bin/zramraid-config;
+
+if [[ $deb_release < 8 ]]; 
+     then
+	update-rc.d -n zramraid-manager defaults;
+     else
+	cp -f $PWD/lib/systemd/system/zramraid.service /lib/systemd/system/zramraid.service;
+	/bin/systemctl enable zramraid.service;
+	if [ -f "/lib/systemd/system/libvirt-guests.service" ];
+	    then
+		if [ $(cat /lib/systemd/system/libvirt-guests.service|grep zramraid|wc -m ) = 0 ];
+		    then
+			sed -i '/Requires=virt-guest-shutdown.target/a \'"Requires=zramraid.service" /lib/systemd/system/libvirt-guests.service;
+		fi
+	fi
 fi
-if [ $(echo $debversion|grep wheezy|wc -m) != 0 ]
-    then
-    update-rc.d -n zraid-manager defaults;
-fi
-## update-rc.0 ..
-reports[${#reports[@]}]="zraid install susseful";
-reports[${#reports[@]}]="please setup config for autostart from boot: /etc/default/zraid.";
+reports[${#reports[@]}]="zramraid install susseful";
+reports[${#reports[@]}]="please setup config for autostart from boot: /etc/default/zramraid.";
 writeToLog;
 printInfo;
 }
@@ -180,36 +173,39 @@ printInfo;
 function uninstall() {
 
 function zrDel() {
-if [ $(echo $debversion|grep jessie|wc -m) != 0 ]
-    then
-/bin/systemctl stop zraid-manager;
-/bin/systemctl disable zraid-start.service;
-/bin/systemctl disable zraid-monitor.service;
-rm /lib/systemd/system/zraid-start.service;
-rm /lib/systemd/system/zraid-monitor.service;
+if [[ $deb_release < 8 ]]; 
+     then
+	/etc/init.d/zramraid-manager stop;
+	update-rc.d -n zramraid-manager remove;
+     else
+    /bin/systemctl stop zramraid.service;
+    /bin/systemctl disable zramraid.service;
+    rm /lib/systemd/system/zramraid.service;
+    if [ -f "/lib/systemd/system/libvirt-guests.service" ];
+	    then
+		if [ ! $(cat /lib/systemd/system/libvirt-guests.service|grep zramraid|wc -m ) = 0 ];
+		    then
+			sed -i -e '/'"Requires=zramraid.service"'/d' /lib/systemd/system/libvirt-guests.service;
+		fi
+	fi
 fi
-if [ $(echo $debversion|grep wheezy|wc -m) != 0 ]
-    then
-    /etc/init.d/zraid-manager stop;
-    update-rc.d -n zraid-manager remove;
-fi
-	rm -f /usr/local/bin/zraid-maker;
-	rm -f /usr/local/bin/zraid-config;
-	rm -f /etc/zraid/messages.dat;
-	rm -f /etc/zraid/zraid-config;
-	rm -f /etc/zraid/zraid-maker;
-	rm -f /etc/init.d/zraid-manager;
-	rm -f /etc/default/zraid;
+	rm -f /usr/local/bin/zramraid-maker;
+	rm -f /usr/local/bin/zramraid-config;
+	rm -f /etc/zramraid/messages.dat;
+	rm -f /etc/zramraid/zramraid-config;
+	rm -f /etc/zramraid/zramraid-maker;
+	rm -f /etc/init.d/zramraid-manager;
+	rm -f /etc/default/zramraid;
     }
 
-if [ ! -f "/etc/zraid/zraid.conf" ]
+if [ ! -f "/etc/zramraid/zramraid.conf" ]
     then
     zrDel;
-    rm -rf /etc/zraid;
+    rm -rf /etc/zramraid;
     else
     zrDel;
 fi
-reports[${#reports[@]}]="zraid uninstall susseful";
+reports[${#reports[@]}]="zramraid uninstall susseful";
 writeToLog;
 printInfo;
 
@@ -240,17 +236,17 @@ for ((ex_index=0; ex_index != ${#execute_func[@]}; ex_index++))
 done
 }
 
-##- Begin ZRAID
+##- Begin zramraid
 case "$option" in
 
-## install zraid
+## install zramraid
 "--install" | "--install" )
 execute_func=( ${operation_install[@]} );
 executor;
 exit 0
 ;;
 
-## uninstall zraid
+## uninstall zramraid
 "--uninstall" | "--uninstall" )
 execute_func=( ${operation_uninstall[@]} );
 executor;

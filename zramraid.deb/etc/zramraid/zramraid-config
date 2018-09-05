@@ -1,13 +1,14 @@
 #!/bin/bash
-## zraid-config
+## zramraid-config
 ## (c) author's idea and realization: Kleemov A. & Koshuba V.
 ## script author: Koshuba V - stvixfree@gmail.com
+## License: GPLv3
 ## all parameters
 ##settime=$(date +%s%3N);
 option=$1;
 params=$2;
-PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zraid";
-version="10.03.18";
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zramraid";
+version="25.06.18";
 ## msg [53]
 set_msg=( '"0" "0"' '"1" "0"' '"2" "0"' '"3" "0"' '"4" "0"' '"5" "0"' '"6" "1"' '"7" "1"' '"8" "1"' 
 	'"9" "1"' '"10" "1"' '"11" "1"' '"12" "1"'  '"13" "1"' '"14" "1"' '"15" "1"' '"16" "0"' 
@@ -26,10 +27,10 @@ free_mem=$(cat /proc/meminfo |awk '/^MemAvailable:/{print $2}');
 limit_mem=0;
 info_limit_mem=0;
 total_size_images=0;
-zpath="/etc/zraid";
-zconfig="zraid.conf";
-zmsg="/etc/zraid/messages.dat";
-log="/var/log/zraid.log";
+zpath="/etc/zramraid";
+zconfig="zramraid.conf";
+zmsg="/etc/zramraid/messages.dat";
+log="/var/log/zramraid.log";
 reports=();
 id_zmd=();
 image_zmd=();
@@ -121,7 +122,7 @@ value_in="";
 function writeToLog() {
 for ((rpt_index=0; rpt_index != ${#reports[@]}; rpt_index++))
 do
-    echo  "$rdate zraid message: ${reports[$rpt_index]}">>$log;
+    echo  "$rdate zramraid message: ${reports[$rpt_index]}">>$log;
 done
 }
 
@@ -243,7 +244,7 @@ if [[ ! $(cat $zmsg|grep "$lang"|wc -m) == 0 ]]
 
 ##--@F step operation
 function readConf() {
-# test enable file zraid.conf
+# test enable file zramraid.conf
 if [ ! -f $zpath/$zconfig ]
     then
     reports=();
@@ -500,7 +501,7 @@ if [ ! -f $zpath/$zconfig ]
     then
         confNew;
     else
-        cp $zpath/$zconfig $zpath/$(date +%H_%M)"-zraid.old">/dev/null;
+        cp $zpath/$zconfig $zpath/$(date +%H_%M)"-zramraid.old">/dev/null;
         confNew;
 fi
 }
@@ -645,7 +646,7 @@ done
 
 }
 
-##- Begin ZRAID
+##- Begin zramraid
 case "$option" in
 
 ## create default config +

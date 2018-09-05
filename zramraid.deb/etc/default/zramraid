@@ -1,0 +1,5 @@
+## service start
+# mode - startup parameter zramraid system in manual or automatic mode, examples: mode="auto" or mode="manual"
+# if "manual" zramraid does not start automatically at startup, dafult - "manual" 
+#
+mode="manual";

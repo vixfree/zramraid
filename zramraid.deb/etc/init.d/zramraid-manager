@@ -1,0 +1,77 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          zramraid-manager
+# Required-Start:    udev $local_fs $remote_fs $time
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start the zraid
+# Description:       starts zraid using start-stop-daemon
+### END INIT INFO
+## version =25.06.18
+PARMS=$1
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/zramraid";
+DESC="Zram Raid"
+NAME="zramraid"
+SCRIPTNAME="zramraid-maker";
+ZPATH="/etc/zramraid"
+MODE="/etc/default/zramraid";
+##
+
+if [[ "$PARMS" = '' ]];
+ then
+    echo "/etc/init.d/zramraid-manager {start|stop|restart|status}"
+ exit 0
+fi
+
+function zRun() {
+if [ ! $(echo $USER|grep root|wc -m) = 0 ]
+    then
+    if [ $(cat $MODE |grep mode|grep -v '#'|sed 's/\mode=//g'|sed 's/\"//g;s/\;//g'|grep auto|wc -m) == 0 ]
+	then
+	    echo "$(date) $NAME: no autostart from boot! mode=manual - /etc/defaults/zramraid">>/var/log/zramraid.log
+	    exit 0;
+	else
+	$ZPATH/$SCRIPTNAME --on
+    fi
+    exit 0;
+fi
+echo "$NAME:Sorry.. The only root privileges!"
+exit 0;
+}
+
+### begin
+case "$PARMS" in
+"start" | "start" )
+zRun;
+exit 0
+;;
+
+"stop" | "stop" )
+$ZPATH/$SCRIPTNAME --off
+exit 0
+;;
+
+"restart" | "restart" )
+$ZPATH/$SCRIPTNAME --off
+sleep 3
+zRun;
+exit 0
+;;
+
+"status" | "status" )
+$ZPATH/$SCRIPTNAME --status
+exit 0
+;;
+
+"boot" | "boot" )
+zBoot;
+exit 0
+;;
+
+* )
+echo
+echo "no input parameters."
+exit 1
+;;
+esac

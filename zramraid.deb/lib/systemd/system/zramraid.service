@@ -1,0 +1,21 @@
+[Unit]
+SourcePath=/etc/zramraid/zramraid-maker
+Description=zram raid system
+Before=libvirt-guests.service libvirtd.service runlevel2.target runlevel3.target runlevel4.target runlevel5.target shutdown.target 
+After=dbus.service iscsid.service apparmor.service local-fs.target
+Conflicts=shutdown.target 
+
+[Service]
+User=root
+Group=root
+Type=oneshot
+GuessMainPID=no
+RemainAfterExit=yes
+WorkingDirectory=/etc/zramraid/
+ExecStart=/etc/init.d/zramraid-manager start
+ExecStop=/etc/init.d/zramraid-manager stop
+ExecReload=/etc/init.d/zramraid-manager restart
+TimeoutSec=5min
+
+[Install]
+WantedBy=multi-user.target
