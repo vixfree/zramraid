@@ -21,42 +21,56 @@ BASH language code consists of 3 scripts:
 
 ## How to use:
 
-zramraid-install --install
+```shell
+$ zramraid-install --install
+```
 
 and...
 
-
-1. Create an image of the required size, consider the size of allocated RAM to mirror your image!
+1. Create an image of the required size, consider the size of allocated RAM to mirror your image
    
-   example:
-   cat /proc/meminfo |grep MemAvailable
+   ```shell
+   $ cat /proc/meminfo |grep MemAvailable
    MemAvailable:    6638832 kB
+   ```
 
    or:
 
-   zramraid-config --list
+   ```shell
+   $ zramraid-config --list
+   ```
 
-2. Create image:
+2. Create image
    
-   fallocate -l 3G /home/kvm/disk0.img
+   ```shell
+   $ fallocate -l 3G /home/kvm/disk0.img
+   ```
 
-3. Create zramraid:
+3. Create zramraid
    
-   zramraid-config --add md0:/home/kvm/disk0.img
+   ```shell
+   $ zramraid-config --add md0:/home/kvm/disk0.img
+   ```
 
-4. Check the configuration:
+4. Check the configuration
 
-   zramraid-config --list
+   ```shell
+   $ zramraid-config --list
+   ```
 
-5. Start or restart zramraid:
+5. Start or restart zramraid
    
-   /etc/init.d/zramraid-manager restart
+   ```shell
+   $ /etc/init.d/zramraid-manager restart
+   ```
 
-   or:
+   or
 
-   systemctl restart zramraid-manager
+   ```shell
+   $ systemctl restart zramraid-manager
+   ```
    
-6. Result:
+6. Result
 
    ```
    cat /proc/mdstat
@@ -87,15 +101,14 @@ zramraid-install --help
 ## Using with KVM
 
 If you plan to use zramraid together with KVM then we recommend making a change for the systemd:
+
 ```
 editor /lib/systemd/system/libvirt-guests.service
 ...
 Requires=zramraid.service
-...
 ```
  
 * see example files from /lib/systemd/system
-
 
 version - 27.06.18
 
